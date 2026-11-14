@@ -102,7 +102,7 @@ Set a **stable `secret`** in production. If omitted, a random per-process secret
 
 ## Session stores
 
-Both stores use a single `x_sessions` table and implement the `SessionStore` interface (`create`, `find`, `revoke`) if you want to bring your own.
+Both stores use a single `x_sessions` table and implement the `SessionStore` interface (`create`, `find`, `revoke`, `revokeAllForUser`) if you want to bring your own.
 
 ```ts
 createSQLiteSessionStore({ path: "data/auth.db" });   // default: data/auth.db
