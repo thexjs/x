@@ -11,10 +11,10 @@ export default function Dashboard() {
       </p>
       <form
         method="POST"
-        action="/api/auth/logout"
+        action="/api/auth/signout"
         onSubmit={(e) => {
           e.preventDefault();
-          fetch("/api/auth/logout", { method: "POST" }).then(() => {
+          fetch("/api/auth/signout", { method: "POST" }).then(() => {
             window.location.href = "/login";
           });
         }}
