@@ -10,6 +10,7 @@ package. Each `packages/*` directory keeps its own authoritative changelog:
 - [`@thexjs/hooks`](packages/hooks/CHANGELOG.md)
 - [`@thexjs/adapter-vercel`](packages/adapter-vercel/CHANGELOG.md)
 - [`create-thexjs-app`](packages/create-thexjs-app/CHANGELOG.md)
+- [`@thexjs/mcp`](packages/mcp/CHANGELOG.md)
 
 Versioning policy and support windows live in
 [`VERSIONING.md`](VERSIONING.md) and [`SUPPORT.md`](SUPPORT.md). Changes before
