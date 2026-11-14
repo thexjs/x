@@ -67,7 +67,7 @@ mutations) CSRF.
 | **T**ampering | Low–medium. Requests are not signed. CSRF protects browser-driven mutations via origin verification (see `SECURITY.md`). |
 | **R**epudiation | Medium. Request logs (`observability.logging`) capture method, path, status, and duration but **not** request bodies; no per-user audit trail unless you add one. See [Audit logging](#audit-logging). |
 | **I**nformation disclosure | Medium. An uncaught error in an API route returns a clean `500` (global error boundary) and is reported to the error reporter — the stack does not leak to the client. Response bodies are whatever your handler returns. |
-| **D**enial of service | Medium. Global rate limiter (60/min/IP default); no per-route limits, no body-size cap, no timeouts on your handler. See [SLOs & DoS](#slos--dos). |
+| **D**enial of service | Medium. Global rate limiter (60/min/IP default) plus a request-body-size cap (`maxBodySize`, default 1 MiB, enforced ahead of route/action dispatch — `packages/core/src/security/body-size.ts`); no per-route limits, no timeouts on your handler. See [SLOs & DoS](#slos--dos). |
 | **E**levation of privilege | **High — see the crash-blast-radius note.** An exception is contained per-request (500 + error reporter), so a throwing handler does **not** crash the process. But API routes share the process with everything else: a handler that blocks the event loop (sync CPU loop, unawaited long operation) degrades or stalls **all** routes. See [Process isolation](#process-isolation). |
 
 ### 3. Server functions (`/__x/actions/*`)
@@ -93,7 +93,7 @@ attack surface because it is reachable from shipped browser bundles.
 | **T**ampering | Low. Session cookies are `HttpOnly; SameSite=Lax` (+ `Secure` in production). CSRF covers auth POSTs (`signin`, `signout`). |
 | **R**epudiation | Medium. Session lifecycle (create/revoke) is logged at the storage layer; there is no tamper-evident audit log (see [Audit logging](#audit-logging)). |
 | **I**nformation disclosure | Low–medium. Only the HMAC digest of the token is stored, so a DB leak does not expose usable cookies. Password hashes (Argon2id) are stored; a DB leak still exposes hashes to offline cracking — require strong passwords. |
-| **D**enial of service | Medium. Login endpoints are subject to the global rate limiter (brute force throttled); no account lockout or per-account throttling beyond that. |
+| **D**enial of service | Low–medium. Login endpoints are subject to the global rate limiter, plus a dedicated per-account/per-IP brute-force guard (`createBruteForceGuard` in `packages/auth/src/brute-force.ts`, wired into `defineAuth`'s credentials flow) with exponential backoff — 5 consecutive failures locks the account independently of the caller's IP. |
 | **E**levation of privilege | Low–medium. Session fixation is countered by OAuth state; `@thexjs/auth` is opt-in — the demo auth in the `basic`/`saas` templates is **hardcoded `admin`/`admin` and DEMO ONLY** (see `SECURITY.md`). Shipping the demo auth is a real elevation risk. |
 
 ### 5. Image proxy (`/_x/image/*`)
@@ -145,11 +145,19 @@ is confirmed, the framework's isolation story is single-tenant by design.
 ### Audit logging
 
 **Current state:** structured JSON request logs exist (`observability.logging`)
-but are **not** append-only or tamper-evident, and there is no audit-logging
-facility for who did what. For compliance-bound deployments this is a gap —
-tracked in [#74](https://github.com/thexjs/x/issues/74). Until it
-lands, treat request logs as best-effort operational telemetry, not an
-accountability record. See `DATA_POLICIES.md` for the retention corollary.
+for general operational telemetry. Separately, `@thexjs/core`'s
+`observability/audit.ts` provides a dedicated, pluggable audit-event facility
+(`auth.login.success`/`failure`, `logout`, `password_changed`, `role_changed`,
+`permission_denied`, `session_revoked`), with a default append-at-the-OS-level
+stdout sink and a `setAuditSink` hook for shipping entries to a SIEM. It is
+wired into `@thexjs/auth`'s login/logout/RBAC-denial paths today, so
+auth-relevant events do get a "who did what, when" record out of the box.
+What's still a gap: the default sink is not tamper-evident (no hash chaining
+or external attestation), and non-auth business actions (e.g. a mutation in
+your own API routes/actions) are not audited unless you call the audit API
+yourself. For compliance-bound deployments, pair the default sink with an
+append-only/WORM destination. See `DATA_POLICIES.md` for the retention
+corollary.
 
 ### Supply chain
 
@@ -169,9 +177,13 @@ rerun the scans on a cadence, not just at PR time.
 The load test runs in CI with SLO gates (p95 latency and error rate — see
 `BENCHMARKS.md`). That keeps performance regressions from silently landing but
 is **not** a DoS mitigation: the global rate limiter (60 req/min/IP default,
-Redis-backed for multi-instance) is the framework's DoS control, and it bounds
-request rate, not work per request. A single expensive request still blocks the
-shared process (see [Process isolation](#process-isolation)).
+Redis-backed for multi-instance) is the framework's primary DoS control, and it
+bounds request rate, not work per request. An opt-in backpressure controller
+(`createApp({ backpressure: { maxConcurrent, maxQueue } })`) caps in-flight
+concurrency and returns `503`/`Retry-After` once saturated, but it has no
+per-request execution-time limit — a single slow/expensive request still
+occupies a concurrency slot (and, if unbounded, the shared process) for as
+long as it runs (see [Process isolation](#process-isolation)).
 
 ## Prioritized residual risks
 
@@ -180,7 +192,7 @@ shared process (see [Process isolation](#process-isolation)).
 | Event-loop monopoly stalls all routes | medium | high | no containment; #85, deploy replicas |
 | Demo auth shipped in production | medium | high | documented DEMO ONLY; must replace (`SECURITY.md`) |
 | Secret in `public/` served silently | low | high | documented; env-leak scan doesn't cover `public/` |
-| No audit trail for privileged actions | medium | medium | #74 |
+| No audit trail for non-auth privileged actions (your own routes/actions) | medium | medium | `@thexjs/auth` events are audited by default (see Audit logging); add `observability.audit` calls yourself elsewhere |
 | Multi-tenant data leakage (if multi-tenant) | conditional | critical | #76; single-tenant assumption today |
 | SSRF via allow-listed host serving private data | low | medium | allow-list hygiene; hop-by-hop recheck |
 | Supply-chain CVE | low | high | SBOM + Trivy + `bun audit` gates in CI |
@@ -188,11 +200,14 @@ shared process (see [Process isolation](#process-isolation)).
 ## Independent security audit
 
 An independent third-party security audit is **not yet commissioned**. It is
-planned once the hardening backlog (process isolation #85, audit logging #74,
-multi-tenant scope #76, session review #75, backpressure #89) lands, so the
-audit examines the hardened state rather than the current one. When it
-completes, findings will be resolved or explicitly risk-accepted and linked
-here, with this document updated accordingly.
+planned once the remaining hardening backlog (process isolation #85,
+multi-tenant scope #76, session review #75) lands, so the audit examines the
+hardened state rather than the current one. Audit logging (#74) and an
+opt-in per-process backpressure/concurrency limiter (#89,
+`packages/core/src/backpressure.ts`, wired via `createApp`'s `backpressure`
+option) have already shipped. When the audit completes, findings will be
+resolved or explicitly risk-accepted and linked here, with this document
+updated accordingly.
 
 ## Reporting
 
