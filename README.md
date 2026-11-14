@@ -9,7 +9,7 @@ A full-stack React framework built on top of Bun. It has file-based routing, API
 </p>
 
 <p align="center">
-<a href="#quick-start"><img src="https://img.shields.io/badge/Bun-1.0+-black?style=flat-square&logo=bun" alt="Bun Ready"></a>
+<a href="#quick-start"><img src="https://img.shields.io/badge/Bun-1.3+-black?style=flat-square&logo=bun" alt="Bun Ready"></a>
 <a href="#features"><img src="https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react" alt="React 19"></a>
 <a href="#features"><img src="https://img.shields.io/badge/TypeScript-Strict-blue?style=flat-square&logo=typescript" alt="TypeScript"></a>
 <a href="./ROADMAP.md"><img src="https://img.shields.io/badge/Status-Maintenance-yellow?style=flat-square" alt="Status"></a>
@@ -61,7 +61,7 @@ packages/core                 file-based router, SSR renderer, middleware
 packages/cli                  x dev / x build / x start
 packages/env                  typed env variable validation
 packages/auth                 credentials + OAuth2/GitHub auth, sessions, CSRF
-packages/hooks                client-side hook helpers (useSession, usePageData, ...)
+packages/hooks                client-side hook helpers (useDebounce, useForm, useServerAction, ...)
 packages/adapter-vercel       Vercel Build Output API adapter
 packages/create-thexjs-app    the scaffolder (bun create thexjs-app@latest)
 packages/mcp                  MCP server so AI agents get x's conventions right
@@ -332,9 +332,9 @@ releases. Pin exact versions if stability matters to you.
   changelogs when merged to `main`.
 - The release GitHub Action (`publish` on `main`) creates a versioning PR and
   publishes to npm on merge.
-- Currently published: `@thexjs/core` (1.8.x), `@thexjs/cli` (1.1.x),
+- Currently published: `@thexjs/core` (1.9.x), `@thexjs/cli` (1.1.x),
   `@thexjs/env` (1.1.x), `@thexjs/auth` (3.0.x), `@thexjs/hooks` (0.2.x),
-  `@thexjs/adapter-vercel` (1.0.x), `create-thexjs-app` (1.2.x).
+  `@thexjs/adapter-vercel` (1.0.x), `create-thexjs-app` (1.2.x), `@thexjs/mcp` (0.1.x).
 
 ## Known limitations
 
