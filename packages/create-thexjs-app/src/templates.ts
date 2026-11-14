@@ -52,9 +52,11 @@ export const FEATURES: FeatureAddon[] = [
   {
     id: "auth",
     label: "Auth (sessions + login)",
-    hint: "SQLite-backed demo sessions, /login and a protected /dashboard",
+    hint: "Real @thexjs/auth credentials provider -- /login, /signup, and a protected /dashboard",
     default: false,
-    dependencies: {},
+    dependencies: {
+      "@thexjs/auth": "^3.0.0",
+    },
     devDependencies: {},
   },
   {
