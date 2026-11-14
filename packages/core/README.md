@@ -204,6 +204,8 @@ await build({ pagesDir: "./src/pages", outDir: "./.x" });
 
 `build()` writes prerendered `static` pages (and copies `public/`) to `<outDir>/client`; that output is a plain static site, deployable anywhere (Vercel, Netlify, any CDN). Any page left in the default `server` mode requires a running Bun process (`x start`) and **is not included in the static output**. It needs a Bun-capable host (Fly.io, a VPS, Docker, etc.), not a static host or a Node-only serverless platform.
 
+A single Bun process serves every request for a given server-mode app — there's no per-request isolation. `requestTimeoutMs` bounds how long any one request can take before it's given up on (504), so a hung handler can't stall the process forever, but it doesn't free up CPU mid-flight. For real isolation under load, run at least two replicas behind a load balancer in production.
+
 ## Enterprise readiness: security & observability
 
 `createApp` accepts optional `security` and `observability` config, all on by sane defaults:
@@ -214,6 +216,12 @@ import { createApp, createSentryReporter } from "@thexjs/core";
 const app = createApp({
   pagesDir: "./src/pages",
   actionsDir: "./src/actions",
+  // Opt in once you know your app has no legitimately-long requests (or has
+  // raised the budget on those routes specifically): a handler that hangs
+  // past this gets a 504 instead of stalling every other request. Unset by
+  // default. See "Deployment note" below for the single-process caveat this
+  // only partially covers.
+  requestTimeoutMs: 30_000,
   security: {
     // Origin/Referer verification on /__x/actions/* is always on; add explicit
     // cross-subdomain origins here, or requireToken for double-submit CSRF cookies.
