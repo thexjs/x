@@ -1,25 +1,24 @@
-// Minimal demo auth backed by a local SQLite database.
+// Real auth, backed by @thexjs/auth -- a credentials (email + password)
+// provider against a local `users` table, Argon2id password hashing, and
+// HMAC'd sessions in a SQLite-backed store. See @thexjs/auth's README for
+// OAuth providers, roles/permissions, and swapping in Postgres.
 //
-// This is intentionally simple (plaintext "admin"/"admin" credentials, no
-// password hashing, no session expiry). It exists to show the wiring for
-// sessions + protected routes. Replace it with a real auth strategy
-// (hashed passwords, OAuth, etc.) before shipping anything production.
+// Set AUTH_SECRET in production (any stable random string) -- without it,
+// sessions are HMAC'd with a per-process random secret and every restart
+// invalidates them. defineAuth throws on boot if it's missing in production;
+// in development a random one is generated for you automatically.
 
 import type { Database } from "bun:sqlite";
-import { randomUUID } from "node:crypto";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import {
+  type AuthUser,
+  createSQLiteSessionStore,
+  defineAuth,
+  hashPassword,
+  verifyPassword,
+} from "@thexjs/auth";
 import { connectSQLite, runSQLiteMigrations } from "@thexjs/core/data";
-
-const SESSION_COOKIE = "x_session";
-const SESSION_MAX_AGE = 60 * 60 * 24 * 7;
-
-export interface Session {
-  id: string;
-  token: string;
-  user_id: string;
-  username: string;
-}
 
 let db: Database | null = null;
 
@@ -32,54 +31,60 @@ function getDb(): Database {
   return db;
 }
 
-export function createSession(username: string): Session {
-  const database = getDb();
-  const id = randomUUID();
-  const token = randomUUID();
-  const userId = `user_${randomUUID().slice(0, 8)}`;
+interface UserRow {
+  id: string;
+  email: string;
+  password_hash: string;
+  name: string | null;
+}
 
-  database.run("INSERT INTO sessions (id, token, user_id, username) VALUES (?1, ?2, ?3, ?4)", [
+/**
+ * Creates a user with a hashed password. `defineAuth` itself has no
+ * "create user" API -- that's always app-specific -- so this is what
+ * `src/api/auth/signup.ts` calls. Throws if the email is already taken.
+ */
+export async function createUser(
+  email: string,
+  password: string,
+  name?: string,
+): Promise<AuthUser> {
+  const database = getDb();
+  const existing = database.prepare("SELECT id FROM users WHERE email = ?1").get(email);
+  if (existing) throw new Error("An account with that email already exists");
+
+  const id = crypto.randomUUID();
+  const passwordHash = await hashPassword(password);
+  database.run("INSERT INTO users (id, email, password_hash, name) VALUES (?1, ?2, ?3, ?4)", [
     id,
-    token,
-    userId,
-    username,
+    email,
+    passwordHash,
+    name ?? null,
   ] as unknown as string[]);
-
-  return { id, token, user_id: userId, username };
+  return name !== undefined ? { id, email, name } : { id, email };
 }
 
-export function getSession(token: string | undefined): Session | null {
-  if (!token) return null;
-  const database = getDb();
-  const row = database
-    .prepare("SELECT id, token, user_id, username FROM sessions WHERE token = ?1")
-    .get(token) as { id: string; token: string; user_id: string; username: string } | null;
-  if (!row) return null;
-  return { id: row.id, token: row.token, user_id: row.user_id, username: row.username };
-}
-
-export function deleteSession(token: string): void {
-  const database = getDb();
-  database.run("DELETE FROM sessions WHERE token = ?1", [token] as unknown as string[]);
-}
-
-export function parseSessionCookie(cookieHeader: string | null): string | undefined {
-  if (!cookieHeader) return undefined;
-  for (const part of cookieHeader.split(";")) {
-    const trimmed = part.trim();
-    if (trimmed.startsWith(`${SESSION_COOKIE}=`)) {
-      return trimmed.slice(SESSION_COOKIE.length + 1);
-    }
-  }
-  return undefined;
-}
-
-const SECURE_COOKIE_FLAG = process.env.NODE_ENV === "production" ? "; Secure" : "";
-
-export function setSessionCookie(token: string): string {
-  return `${SESSION_COOKIE}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_MAX_AGE}${SECURE_COOKIE_FLAG}`;
-}
-
-export function clearSessionCookie(): string {
-  return `${SESSION_COOKIE}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${SECURE_COOKIE_FLAG}`;
-}
+export const auth = defineAuth({
+  ...(process.env.AUTH_SECRET ? { secret: process.env.AUTH_SECRET } : {}),
+  store: createSQLiteSessionStore({ db: getDb() }),
+  successRedirect: "/dashboard",
+  providers: [
+    {
+      id: "local",
+      name: "Local",
+      type: "credentials",
+      async authorize({ email, password }) {
+        if (!email || !password) return null;
+        const database = getDb();
+        const row = database
+          .prepare("SELECT id, email, password_hash, name FROM users WHERE email = ?1")
+          .get(email) as UserRow | null;
+        if (!row) return null;
+        const valid = await verifyPassword(password, row.password_hash);
+        if (!valid) return null;
+        return row.name !== null
+          ? { id: row.id, email: row.email, name: row.name }
+          : { id: row.id, email: row.email };
+      },
+    },
+  ],
+});
