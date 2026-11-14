@@ -63,6 +63,7 @@ packages/env                  typed env variable validation
 packages/auth                 credentials + OAuth2/GitHub auth, sessions, CSRF
 packages/hooks                client-side hook helpers (useSession, usePageData, ...)
 packages/adapter-vercel       Vercel Build Output API adapter
+packages/adapter-node         generic Node.js adapter (Railway, Render, a bare VPS)
 packages/create-thexjs-app    the scaffolder (bun create thexjs-app@latest)
 packages/mcp                  MCP server so AI agents get x's conventions right
 examples/default              minimal starter
