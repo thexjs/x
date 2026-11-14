@@ -9,18 +9,18 @@ export default function Login() {
     setError("");
     setLoading(true);
     const form = e.currentTarget;
-    const data = { username: form.username.value, password: form.password.value };
+    const data = new FormData();
+    data.set("email", form.email.value);
+    data.set("password", form.password.value);
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(data),
-      });
+      // @thexjs/auth's credentials sign-in expects form data and redirects
+      // (302 -> successRedirect) on success; fetch follows that redirect
+      // automatically and returns the final response.
+      const res = await fetch("/api/auth/signin/local", { method: "POST", body: data });
       if (res.ok) {
         window.location.href = "/dashboard";
       } else {
-        const err = (await res.json()) as { error?: string };
-        setError(err.error ?? "Login failed");
+        setError(res.status === 429 ? "Too many attempts, try again later" : "Invalid credentials");
       }
     } catch {
       setError("Network error");
@@ -34,12 +34,12 @@ export default function Login() {
       <h1 style={{ fontSize: "1.5rem", marginBottom: "1rem" }}>Sign in</h1>
       <form onSubmit={handleSubmit} style={{ display: "grid", gap: "0.75rem" }}>
         <label style={{ display: "grid", gap: "0.25rem" }}>
-          Username
-          <input name="username" defaultValue="admin" required style={field} />
+          Email
+          <input name="email" type="email" required style={field} />
         </label>
         <label style={{ display: "grid", gap: "0.25rem" }}>
           Password
-          <input name="password" type="password" defaultValue="admin" required style={field} />
+          <input name="password" type="password" required style={field} />
         </label>
         {error && <p style={{ color: "#dc2626", fontSize: "0.85rem" }}>{error}</p>}
         <button type="submit" disabled={loading} style={submit}>
@@ -47,7 +47,7 @@ export default function Login() {
         </button>
       </form>
       <p style={{ fontSize: "0.8rem", color: "#64748b", marginTop: "1rem" }}>
-        Demo credentials: <code>admin</code> / <code>admin</code>
+        No account yet? <a href="/signup">Sign up</a>
       </p>
     </main>
   );
