@@ -116,6 +116,20 @@ export interface CreateAppOptions {
    */
   maxBodySize?: number;
   /**
+   * Maximum time, in milliseconds, a single request may take before the
+   * server gives up waiting and responds with 504 Gateway Timeout. Enforced
+   * around the whole dispatch (routing, loaders, actions, API handlers) — a
+   * handler that hangs past this budget can no longer stall every other
+   * request in the process indefinitely. The handler keeps running after the
+   * timeout fires (JS can't forcibly cancel synchronous work), so this bounds
+   * how long a *caller* waits, not CPU usage.
+   *
+   * Default: unset (no timeout). Opt in deliberately: a timeout that's too
+   * low will cut off legitimately slow routes (large SSR pages, streaming
+   * responses, long-running server actions) with a hard 504.
+   */
+  requestTimeoutMs?: number;
+  /**
    * Maximum entries in the per-route island bundle caches (both the
    * route→script-list mapping and the URL→bundled-JS file cache). Entries are
    * evicted LRU (oldest-first) once the cap is exceeded. Default: 500.
@@ -385,6 +399,7 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
       ? null
       : createRateLimiter(options.security?.rateLimit ?? {});
   const maxBodySize = options.maxBodySize ?? DEFAULT_MAX_BODY_SIZE;
+  const requestTimeoutMs = options.requestTimeoutMs;
   const securityHeadersOptions = options.security?.headers;
   const loggingEnabled = options.observability?.logging ?? true;
   const imageProxyHandler = createImageProxyHandler(options.images);
@@ -980,6 +995,45 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
     }
   }
 
+  /**
+   * Bounds how long the wrapped handler may take, so one slow/hung request
+   * can't stall the whole process indefinitely. On expiry, reports the
+   * timeout the same way `guardFetchErrors` reports an exception and returns
+   * 504 instead of waiting forever. No-ops when `requestTimeoutMs` is unset.
+   */
+  const withRequestTimeout =
+    (inner: typeof prodFetchInner) =>
+    async (
+      req: Request,
+      server?: import("./security/rate-limit").RateLimitServer,
+    ): Promise<Response> => {
+      if (!requestTimeoutMs) return inner(req, server);
+
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      const timeout = new Promise<Response>((resolve) => {
+        timer = setTimeout(() => {
+          const path = new URL(req.url).pathname;
+          reportException(new Error(`Request timed out after ${requestTimeoutMs}ms`), {
+            phase: "api",
+            route: path,
+          });
+          metricsReporter?.incr("x_http_errors_total", 1, { phase: "timeout" });
+          resolve(
+            new Response("Gateway Timeout", {
+              status: 504,
+              headers: { "Content-Type": "text/plain; charset=utf-8" },
+            }),
+          );
+        }, requestTimeoutMs);
+      });
+
+      try {
+        return await Promise.race([inner(req, server), timeout]);
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
   async function handleRevalidation(req: Request): Promise<Response | null> {
     if (new URL(req.url).pathname !== "/__x/revalidate") return null;
     if (req.method !== "POST") return new Response("Method not allowed", { status: 405 });
@@ -1240,7 +1294,9 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
       req: Request,
       server?: import("./security/rate-limit").RateLimitServer,
     ) =>
-      withResponseHardening(await guardFetchErrors(withBodySizeLimit(devFetchInner), req, server));
+      withResponseHardening(
+        await guardFetchErrors(withRequestTimeout(withBodySizeLimit(devFetchInner)), req, server),
+      );
     const devFetchBase = loggingEnabled ? withRequestLogging(devFetchHardened) : devFetchHardened;
     // Tracing is outermost so spans cover logging + metrics + hardening. It
     // stamps the request id into the request it forwards, so the logging
@@ -1328,7 +1384,9 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
     req: Request,
     server?: import("./security/rate-limit").RateLimitServer,
   ) =>
-    withResponseHardening(await guardFetchErrors(withBodySizeLimit(prodFetchInner), req, server));
+    withResponseHardening(
+      await guardFetchErrors(withRequestTimeout(withBodySizeLimit(prodFetchInner)), req, server),
+    );
   const prodFetchBase = loggingEnabled ? withRequestLogging(prodFetchHardened) : prodFetchHardened;
   const prodFetchTraced = withRequestTracing(prodFetchBase);
   const prodFetch = metricsReporter
