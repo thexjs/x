@@ -18,6 +18,7 @@ packages/hooks               client-side React hook helpers
 packages/adapter-vercel      Vercel Build Output API adapter
 packages/adapter-node        generic Node.js adapter (Railway, Render, a bare VPS)
 packages/create-thexjs-app   `bun create thexjs-app@latest` scaffolder
+packages/mcp                 MCP server exposing x's docs/conventions for coding agents
 examples/*                   dogfood apps (basic, blog, default, landing, saas)
 ```
 
