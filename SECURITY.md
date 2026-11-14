@@ -20,6 +20,7 @@ is reasonably hardened out of the box:
 | CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy | on | `security.headers` |
 | CSRF origin verification on `/__x/actions/*` | on | `security.csrf` |
 | Rate limiting (60 req/min/IP) | on | `security.rateLimit` |
+| Request body size cap (1 MiB) | on | `maxBodySize` (`createApp` option) |
 | Env-leak scan on every island bundle | on | build step (`assertNoEnvLeakage`) |
 | `/healthz` + `/readyz` | on | `observability.health` |
 
