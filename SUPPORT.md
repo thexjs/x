@@ -18,10 +18,12 @@ All `@thexjs/*` packages ship in **lockstep** on one versioning cycle
 | `@thexjs/env` | 1.x | active |
 | `@thexjs/adapter-vercel` | 1.x | active |
 | `@thexjs/cli` | 1.x | active |
+| `create-thexjs-app` | 1.x | active |
 | `@thexjs/hooks` | 0.x (pre-1.0) | active, stable API coming |
+| `@thexjs/mcp` | 0.x (pre-1.0) | active, stable API coming |
 
-Pre-`1.0.0` packages (currently `@thexjs/hooks`) bump conservatively: prefer
-`patch`, avoid surprise `minor`s (`VERSIONING.md`).
+Pre-`1.0.0` packages (currently `@thexjs/hooks` and `@thexjs/mcp`) bump
+conservatively: prefer `patch`, avoid surprise `minor`s (`VERSIONING.md`).
 
 ## What counts as a breaking change
 

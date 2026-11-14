@@ -14,6 +14,7 @@ bun add @thexjs/cli
 x dev              # start the dev server with hot reload
 x build            # build for production -> .x/ (static export + server bundle)
 x start            # run the production server (run `x build` first)
+x doctor           # diagnose the project: config, dirs, env isolation, dependency health
 
 x run dev          # "run" is optional — an alias, for npm/bun muscle memory
 
