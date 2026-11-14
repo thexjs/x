@@ -13,18 +13,23 @@ written together. There is no independent release cadence per package.
 
 | Package | Status | Current |
 |---|---|---|
-| `@thexjs/core` | `1.x` | 1.8.2 |
+| `@thexjs/core` | `1.x` | 1.9.0 |
 | `@thexjs/auth` | `3.x` | 3.0.11 |
 | `@thexjs/env` | `1.x` | 1.1.0 |
-| `@thexjs/cli` | `1.x` | 1.1.6 |
-| `@thexjs/hooks` | `0.x` | 0.2.0 (pre-1.0) |
-| `@thexjs/mcp` | `0.x` | 0.1.0 (pre-1.0) |
-| `@thexjs/adapter-vercel` | `1.x` | 1.0.11 |
-| `create-thexjs-app` | `1.x` | 1.2.2 |
+| `@thexjs/cli` | `1.x` | 1.1.7 |
+| `@thexjs/hooks` | `0.x` | 0.2.1 (pre-1.0) |
+| `@thexjs/mcp` | `0.x` | 0.1.1 (pre-1.0) |
+| `@thexjs/adapter-vercel` | `1.x` | 1.0.13 |
+| `create-thexjs-app` | `1.x` | 1.2.3 |
 
 `1.0.0` is the first tagged baseline. Before a package reaches `1.0.0`
-(currently only `@thexjs/hooks`), bump conservatively: prefer `patch`, avoid
-surprise `minor`s.
+(currently `@thexjs/hooks` and `@thexjs/mcp`), bump conservatively: prefer
+`patch`, avoid surprise `minor`s.
+
+Exact versions above are a snapshot at doc-edit time and drift between
+releases by design (lockstep publishing bumps them every cycle) — treat the
+`major`/status column, not the patch digit, as the stable fact; check each
+package's own `package.json` or npm listing for the live version.
 
 ## What counts as a breaking change
 
