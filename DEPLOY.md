@@ -37,6 +37,18 @@ NODE_ENV=production bun dist/server/index.ts
 
 > If you omit `--outDir`, both commands default to `.x/` and stay consistent.
 
+### Run more than one process
+
+A single `x start` process serves every request with no per-request isolation — one
+hung or CPU-bound handler can stall everything else in that process. `createApp`'s
+`requestTimeoutMs` option bounds how long any one request can take (returning 504
+once it's exceeded), which stops a hung handler from stalling the process forever,
+but it doesn't free up CPU mid-flight and it's unset by default. **In production,
+run at least two replicas behind a load balancer** — a process manager restarting
+one process (`systemd`, `pm2`, your platform's own supervisor) is not a substitute
+for this; it only recovers after a crash, not during a stall. See the core
+package's README ("Deployment note") and `THREAT_MODEL.md` for the full caveat.
+
 ## Docker
 
 A `Dockerfile` is provided at the project root. Build and run:
