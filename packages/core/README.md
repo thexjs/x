@@ -250,7 +250,7 @@ Only variables prefixed `THEXJS_PUBLIC_` may reach the browser. `@thexjs/env`'s 
 | `Island`, `IslandProvider`, `IslandMode`, `IslandEntry` | Selective hydration |
 | `Image`, `ImageProps`, `buildSrcSet`, `SRCSET_WIDTHS`, `setImageRemoteHosts` | Optimized image component & srcset builder |
 | `Link`, `LinkProps` | Client-side navigation link component |
-| `createImageProxyHandler`, `ImageProxyOptions` | Remote image proxy handler for `_next/image`-style rewriting |
+| `createImageProxyHandler`, `ImageProxyOptions` | Remote image proxy handler, served at `/_x/image?url=...` |
 | `scanContent`, `renderMarkdown`, `escapeHtml`, `ContentEntry`, `Frontmatter` | Markdown content collections |
 | `composeMiddleware`, `MiddlewareContext`, `MiddlewareFn`, `MiddlewareNext` | Middleware |
 | `registerServerFunctions`, `generateServerFunctionClient`, `getServerFunctionHandler`, `resetServerFunctions` | Server functions/actions internals |
