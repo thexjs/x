@@ -168,19 +168,22 @@ function createBunRedisClient(options: { url?: string }): RedisClientFactory {
     // module still type-checks and loads on runtimes where bun:redis isn't
     // available — the failure only surfaces if someone actually uses the Redis
     // store — and so the browser bundle never sees a `node:module` import.
-    const require = import.meta.require;
-    const mod = require("bun:redis") as {
-      RedisClient: new (opts?: {
-        url?: string;
-      }) => RedisClientLike & {
-        connect(): Promise<unknown>;
+    // Bun's client has no `sendCommand`; its raw-command entry point is
+    // `send(command, args)`, which carries EVAL like any other command. Wrap it
+    // so the store sees the `sendCommand(...args)` shape it is written against.
+    const BunRedis = (globalThis as unknown as {
+      Bun: {
+        RedisClient: new (url?: string) => {
+          connect(): Promise<unknown>;
+          send(command: string, args: string[]): Promise<unknown>;
+        };
       };
-    };
-    const instance = options.url
-      ? new mod.RedisClient({ url: options.url })
-      : new mod.RedisClient();
+    }).Bun.RedisClient;
+    const instance = options.url ? new BunRedis(options.url) : new BunRedis();
     await instance.connect();
-    return instance;
+    return {
+      sendCommand: (command, ...args) => instance.send(command, args),
+    };
   };
 }
 
@@ -195,6 +198,39 @@ export function createRedisRateLimitStore(options: { url?: string } = {}): RateL
 }
 
 /**
+ * Atomic increment-and-expire. KEYS[1] = counter key, ARGV[1] = window TTL in
+ * seconds. Sets the TTL whenever the key has none: that is a freshly created
+ * counter, and also a counter stranded without a TTL by the pre-atomic store.
+ */
+const INCR_WITH_WINDOW_SCRIPT = `local c = redis.call('INCR', KEYS[1])
+if redis.call('PTTL', KEYS[1]) == -1 then redis.call('EXPIRE', KEYS[1], ARGV[1]) end
+return { c, redis.call('PTTL', KEYS[1]) }`;
+
+/**
+ * Non-atomic fallback for servers that deny scripting (scripting disabled, or
+ * an ACL without EVAL). Same TTL repair, but two steps instead of one script.
+ */
+async function incrWithoutScript(
+  c: RedisClientLike,
+  redisKey: string,
+  ttlSeconds: number,
+): Promise<unknown[]> {
+  const count = Number(await c.sendCommand("INCR", redisKey));
+  let pttl = Number(await c.sendCommand("PTTL", redisKey));
+  if (pttl === -1) {
+    await c.sendCommand("EXPIRE", redisKey, String(ttlSeconds));
+    pttl = Number(await c.sendCommand("PTTL", redisKey));
+  }
+  return [count, pttl];
+}
+
+/** True when a Redis error says scripting is unavailable to this client. */
+function isScriptingDenied(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /NOSCRIPT|unknown command|NOPERM|scripting is disabled|not allowed/i.test(message);
+}
+
+/**
  * Builds the Redis-backed store from an explicit client factory. Exposed for
  * testing and custom transports; the default factory is Bun's `bun:redis`.
  */
@@ -203,6 +239,8 @@ export function createRedisRateLimitStoreFromClient(
 ): RateLimitStore {
   let client: RedisClientLike | null = null;
   let connecting: Promise<RedisClientLike> | null = null;
+  // Set once the server refuses EVAL, so later calls skip the failing attempt.
+  let scriptingDenied = false;
 
   function getClient(): Promise<RedisClientLike> {
     if (client) return Promise.resolve(client);
@@ -229,16 +267,33 @@ export function createRedisRateLimitStoreFromClient(
       const c = await getClient();
       const redisKey = `x:ratelimit:${key}`;
       const ttlSeconds = Math.max(1, Math.ceil(windowMs / 1000));
-      const count = Number(await c.sendCommand("INCR", redisKey));
-      if (count === 1) {
-        await c.sendCommand("EXPIRE", redisKey, String(ttlSeconds));
+      // INCR, EXPIRE (only when the key has no TTL) and PTTL run in one Lua
+      // script, so one round trip does it and a dropped connection cannot
+      // leave a counter without a TTL. Returns [count, pttl-in-ms].
+      let reply: unknown[];
+      if (scriptingDenied) {
+        reply = await incrWithoutScript(c, redisKey, ttlSeconds);
+      } else {
+        try {
+          reply = (await c.sendCommand(
+            "EVAL",
+            INCR_WITH_WINDOW_SCRIPT,
+            "1",
+            redisKey,
+            String(ttlSeconds),
+          )) as unknown[];
+        } catch (err) {
+          if (!isScriptingDenied(err)) throw err;
+          scriptingDenied = true;
+          reply = await incrWithoutScript(c, redisKey, ttlSeconds);
+        }
       }
+      const count = Number(reply[0]);
       // Derive resetAt from the key's actual remaining TTL rather than from a
       // fresh wall-clock window on every call: Retry-After must converge on the
       // real window reset the EXPIRE enforces, not slide forward with each
-      // request. PTTL returns ms (negative when the key is missing/no TTL).
-      const pttl = Number(await c.sendCommand("PTTL", redisKey));
-      const remainingMs = Math.max(pttl, 0);
+      // request. PTTL is negative when the key is missing/no TTL.
+      const remainingMs = Math.max(Number(reply[1]), 0);
       return { count, resetAt: Date.now() + remainingMs };
     },
   };

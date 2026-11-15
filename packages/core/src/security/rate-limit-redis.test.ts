@@ -29,6 +29,17 @@ class FakeRedis {
   private run(cmd: string, ...args: string[]): Promise<unknown> {
     const now = this.now();
     switch (cmd) {
+      case "EVAL": {
+        // Models the store's Lua script atomically: EVAL args are
+        // [script, numkeys, key, ttlSeconds]; returns [count, pttl].
+        const key = args[2] as string;
+        return this.run("INCR", key).then(async (count) => {
+          if ((await this.run("PTTL", key)) === -1) {
+            await this.run("EXPIRE", key, args[3] as string);
+          }
+          return [count, await this.run("PTTL", key)];
+        });
+      }
       case "INCR": {
         const key = args[0] as string;
         const current = this.values.get(key);
@@ -100,6 +111,81 @@ describe("createRedisRateLimitStoreFromClient", () => {
     limiterB.dispose();
   });
 
+  test("INCR and expiry run in one round trip, so a dropped connection cannot strand a key without a TTL", async () => {
+    const fake = new FakeRedis();
+    const sent: string[] = [];
+    const client: RedisClientLike = {
+      sendCommand: async (cmd, ...args) => {
+        sent.push(cmd);
+        // Simulate the connection dropping after the first command is sent.
+        if (sent.length > 1) throw new Error("connection dropped");
+        return fake.client().sendCommand(cmd, ...args);
+      },
+    };
+    const store = createRedisRateLimitStoreFromClient(async () => client);
+
+    await expect(store.incr("atomic", 60_000)).resolves.toMatchObject({ count: 1 });
+    expect(sent).toEqual(["EVAL"]);
+  });
+
+  test("a key still gets its TTL when the reply to EVAL is lost", async () => {
+    const fake = new FakeRedis();
+    const client: RedisClientLike = {
+      sendCommand: async (cmd, ...args) => {
+        // The server runs the script, then the connection drops before the reply arrives.
+        await fake.client().sendCommand(cmd, ...args);
+        throw new Error("connection dropped");
+      },
+    };
+    const store = createRedisRateLimitStoreFromClient(async () => client);
+
+    await expect(store.incr("lost", 60_000)).rejects.toThrow("connection dropped");
+    expect(await fake.client().sendCommand("PTTL", "x:ratelimit:lost")).toBeGreaterThan(0);
+  });
+
+  test("repairs a counter stranded without a TTL by the old non-atomic store", async () => {
+    const fake = new FakeRedis();
+    // Old bug: the counter reached 5 but EXPIRE never ran.
+    for (let i = 0; i < 5; i++) await fake.client().sendCommand("INCR", "x:ratelimit:stranded");
+    const store = createRedisRateLimitStoreFromClient(async () => fake.client());
+
+    const result = await store.incr("stranded", 60_000);
+    expect(result.count).toBe(6);
+    expect(result.resetAt - Date.now()).toBeGreaterThan(0);
+    expect(await fake.client().sendCommand("PTTL", "x:ratelimit:stranded")).toBeGreaterThan(0);
+  });
+
+  test("falls back to INCR/PTTL when the server denies scripting, and stops retrying EVAL", async () => {
+    const fake = new FakeRedis();
+    const commands: string[] = [];
+    const client: RedisClientLike = {
+      sendCommand: async (cmd, ...args) => {
+        commands.push(cmd);
+        if (cmd === "EVAL") {
+          throw new Error("NOPERM User default has no permissions to run the 'eval' command");
+        }
+        return fake.client().sendCommand(cmd, ...args);
+      },
+    };
+    const store = createRedisRateLimitStoreFromClient(async () => client);
+
+    await expect(store.incr("noscript", 60_000)).resolves.toMatchObject({ count: 1 });
+    await expect(store.incr("noscript", 60_000)).resolves.toMatchObject({ count: 2 });
+    expect(commands.filter((c) => c === "EVAL").length).toBe(1);
+    expect(await fake.client().sendCommand("PTTL", "x:ratelimit:noscript")).toBeGreaterThan(0);
+  });
+
+  test("does not hide non-scripting Redis errors behind the fallback", async () => {
+    const client: RedisClientLike = {
+      sendCommand: async () => {
+        throw new Error("WRONGTYPE Operation against a key holding the wrong kind of value");
+      },
+    };
+    const store = createRedisRateLimitStoreFromClient(async () => client);
+
+    await expect(store.incr("wrongtype", 60_000)).rejects.toThrow("WRONGTYPE");
+  });
+
   test("resetAt derives from the key's remaining TTL, not Date.now()+windowMs (#135)", async () => {
     // Mid-window: the key already has 30s of its 60s window EXPIRED away, so
     // the real reset is only ~30s ahead. The buggy store returned
@@ -110,9 +196,7 @@ describe("createRedisRateLimitStoreFromClient", () => {
     const remaining = 30_000;
     const client: RedisClientLike = {
       sendCommand: async (cmd) => {
-        if (cmd === "INCR") return 2;
-        if (cmd === "EXPIRE") return 1;
-        if (cmd === "PTTL") return remaining;
+        if (cmd === "EVAL") return [2, remaining];
         throw new Error(`unhandled command ${cmd}`);
       },
     };
@@ -143,7 +227,7 @@ describe("createRedisRateLimitStoreFromClient", () => {
     const ttls: string[] = [];
     const client: RedisClientLike = {
       sendCommand: async (cmd, ...args) => {
-        if (cmd === "EXPIRE") ttls.push(args[1] as string);
+        if (cmd === "EVAL") ttls.push(args[3] as string);
         return fake.client().sendCommand(cmd, ...args);
       },
     };
@@ -154,13 +238,12 @@ describe("createRedisRateLimitStoreFromClient", () => {
     expect(ttls).toEqual(["1", "2"]);
   });
 
-  test("sets EXPIRE only on the first increment of a fresh window", async () => {
+  test("uses one EVAL per increment, with the window TTL only set on the first", async () => {
     const fake = new FakeRedis();
     const commands: string[] = [];
     const client: RedisClientLike = {
       sendCommand: async (cmd, ...args) => {
         commands.push(cmd);
-        if (cmd === "INCR") return fake.client().sendCommand(cmd, ...args);
         return fake.client().sendCommand(cmd, ...args);
       },
     };
@@ -168,15 +251,15 @@ describe("createRedisRateLimitStoreFromClient", () => {
 
     await store.incr("e", 60_000);
     await store.incr("e", 60_000);
-    expect(commands.filter((c) => c === "EXPIRE").length).toBe(1);
+    expect(commands).toEqual(["EVAL", "EVAL"]);
   });
 
   test("keys are stored under the x:ratelimit: prefix", async () => {
     const seen: string[] = [];
     const client: RedisClientLike = {
       sendCommand: async (cmd, ...args) => {
-        if (cmd === "INCR") seen.push(args[0] as string);
-        return 1;
+        if (cmd === "EVAL") seen.push(args[2] as string);
+        return [1, 60_000];
       },
     };
     const store = createRedisRateLimitStoreFromClient(async () => client);
@@ -189,7 +272,7 @@ describe("createRedisRateLimitStoreFromClient", () => {
     const factory = async () => {
       attempts += 1;
       if (attempts === 1) throw new Error("ECONNREFUSED");
-      return { sendCommand: async () => 1 };
+      return { sendCommand: async () => [1, 60_000] };
     };
     const store = createRedisRateLimitStoreFromClient(factory);
 
@@ -202,7 +285,7 @@ describe("createRedisRateLimitStoreFromClient", () => {
     let connects = 0;
     const store = createRedisRateLimitStoreFromClient(async () => {
       connects += 1;
-      return { sendCommand: async () => 1 };
+      return { sendCommand: async () => [1, 60_000] };
     });
 
     await store.incr("c", 60_000);
