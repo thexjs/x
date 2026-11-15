@@ -97,8 +97,14 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # GHSA-gcqx-w48m-w2h4 (deepmerge mergeObject() prototype pollution, low
+      # severity) is deliberately ignored here: deepmerge 4.3.1 is the latest
+      # version ever published to npm -- there is no patched release to
+      # upgrade to, via shadcn's own devDependency tree (dev-only codegen
+      # tooling, not shipped). Revisit if deepmerge ever cuts a fixed release,
+      # or drop the dependency entirely if it stays unmaintained.
       - name: Audit dependencies
-        run: bun audit
+        run: bun audit --ignore=GHSA-gcqx-w48m-w2h4
 
       # Guard the production-only graph separately: anything in what's actually
       # shipped must be clean with NO ignores.
