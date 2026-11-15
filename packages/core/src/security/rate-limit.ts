@@ -171,14 +171,18 @@ function createBunRedisClient(options: { url?: string }): RedisClientFactory {
     // Bun's client has no `sendCommand`; its raw-command entry point is
     // `send(command, args)`, which carries EVAL like any other command. Wrap it
     // so the store sees the `sendCommand(...args)` shape it is written against.
-    const BunRedis = (globalThis as unknown as {
-      Bun: {
-        RedisClient: new (url?: string) => {
-          connect(): Promise<unknown>;
-          send(command: string, args: string[]): Promise<unknown>;
+    const BunRedis = (
+      globalThis as unknown as {
+        Bun: {
+          RedisClient: new (
+            url?: string,
+          ) => {
+            connect(): Promise<unknown>;
+            send(command: string, args: string[]): Promise<unknown>;
+          };
         };
-      };
-    }).Bun.RedisClient;
+      }
+    ).Bun.RedisClient;
     const instance = options.url ? new BunRedis(options.url) : new BunRedis();
     await instance.connect();
     return {
