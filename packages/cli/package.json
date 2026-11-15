@@ -1,6 +1,6 @@
 {
   "name": "@thexjs/cli",
-  "version": "1.1.7",
+  "version": "1.2.0",
   "description": "Dev/build/start CLI for x framework apps. Requires Bun to run (https://bun.sh).",
   "keywords": [
     "cli",
@@ -32,11 +32,11 @@
     "bun": ">=1.3.0"
   },
   "dependencies": {
-    "@thexjs/core": "^1.9.0"
+    "@thexjs/core": "^1.10.0"
   },
   "peerDependencies": {
-    "@thexjs/adapter-node": "0.0.0",
-    "@thexjs/adapter-vercel": "^1.0.5"
+    "@thexjs/adapter-node": "0.1.0",
+    "@thexjs/adapter-vercel": "^1.0.14"
   },
   "peerDependenciesMeta": {
     "@thexjs/adapter-node": {
@@ -47,8 +47,8 @@
     }
   },
   "devDependencies": {
-    "@thexjs/adapter-node": "0.0.0",
-    "@thexjs/adapter-vercel": "^1.0.5",
+    "@thexjs/adapter-node": "0.1.0",
+    "@thexjs/adapter-vercel": "^1.0.14",
     "react": "^19.3.1",
     "tsup": "^9.0.0"
   }
