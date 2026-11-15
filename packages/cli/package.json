@@ -50,6 +50,6 @@
     "@thexjs/adapter-node": "0.0.0",
     "@thexjs/adapter-vercel": "^1.0.5",
     "react": "^19.0.0",
-    "tsup": "^8.3.0"
+    "tsup": "^9.0.0"
   }
 }
