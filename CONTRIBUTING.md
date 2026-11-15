@@ -16,6 +16,7 @@ packages/cli                 x dev / x build / x start
 packages/env                 type-safe env validation
 packages/hooks               client-side React hook helpers
 packages/adapter-vercel      Vercel Build Output API adapter
+packages/adapter-node        generic Node.js adapter (Railway, Render, a bare VPS)
 packages/create-thexjs-app   `bun create thexjs-app@latest` scaffolder
 packages/mcp                 MCP server exposing x's docs/conventions for coding agents
 examples/*                   dogfood apps (basic, blog, default, landing, saas)
@@ -24,7 +25,9 @@ examples/*                   dogfood apps (basic, blog, default, landing, saas)
 ## Prerequisites
 
 - [Bun](https://bun.sh) 1.3.x or later
-- Node.js is **not** used at any point in this repo
+- Node.js is **not** used to build or test this repo. `packages/adapter-node` targets Node.js as
+  a deploy runtime (its own tests spawn a real `node` process to verify the bundled output), but
+  that's the only place Node.js appears here -- everything else is Bun-only by design.
 
 ## Setup
 
