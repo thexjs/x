@@ -87,6 +87,26 @@ bun run vercel-build
 > self-contained output to the root afterward. Point Vercel at the repo root if
 > you use this option.
 
+## Deploy to a bare Node host (Railway, Render, etc.)
+
+The default `x build`/`x start` path requires a Bun runtime on the host, same as the
+Fly.io/VPS/Docker sections below. If your host only gives you Node.js -- common on
+PaaS platforms that auto-detect and run Node apps -- use `@thexjs/adapter-node`
+instead, which bundles a standalone server with no Bun dependency at runtime:
+
+```sh
+bun add -d @thexjs/adapter-node
+x build --adapter node
+node dist-node/server/index.mjs
+```
+
+This produces `dist-node/static/` (prerendered HTML, island JS, `public/`) and
+`dist-node/server/index.mjs` -- a single file with the whole SSR/API dependency
+graph inlined, serving both static and dynamic requests on one port (`$PORT`,
+default 3000). No separate static host or CDN tier is required, though you can
+still put one in front. See `packages/adapter-node/README.md` for the `trustProxy`
+option (only enable it behind a reverse proxy you control).
+
 ## Deploy to Fly.io
 
 1. Install the [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/)
