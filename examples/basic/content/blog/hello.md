@@ -1,6 +1,6 @@
 ---
-title: Hello from content collections
----
+
+## title: Hello from content collections
 
 This page is rendered from a markdown file in `content/`.
 

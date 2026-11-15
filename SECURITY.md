@@ -15,14 +15,14 @@ below seriously even if the repo itself is young.
 Everything below is **enabled by default** with safe defaults, so a fresh app
 is reasonably hardened out of the box:
 
-| Control | Default | Where |
-|---|---|---|
-| CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy | on | `security.headers` |
-| CSRF origin verification on `/__x/actions/*` | on | `security.csrf` |
-| Rate limiting (60 req/min/IP) | on | `security.rateLimit` |
-| Request body size cap (1 MiB) | on | `maxBodySize` (`createApp` option) |
-| Env-leak scan on every island bundle | on | build step (`assertNoEnvLeakage`) |
-| `/healthz` + `/readyz` | on | `observability.health` |
+| Control                                              | Default | Where                              |
+| ---------------------------------------------------- | ------- | ---------------------------------- |
+| CSP, HSTS, X-Frame-Options, nosniff, Referrer-Policy | on      | `security.headers`                 |
+| CSRF origin verification on `/__x/actions/*`         | on      | `security.csrf`                    |
+| Rate limiting (60 req/min/IP)                        | on      | `security.rateLimit`               |
+| Request body size cap (1 MiB)                        | on      | `maxBodySize` (`createApp` option) |
+| Env-leak scan on every island bundle                 | on      | build step (`assertNoEnvLeakage`)  |
+| `/healthz` + `/readyz`                               | on      | `observability.health`             |
 
 Configuration lives in `x.config.ts` under the `security` and `observability`
 keys. See [Config](https://thexjs.abdelkabir.me/docs) for the full option list.
@@ -56,7 +56,6 @@ Pass `headers: false` to disable entirely (not recommended in production).
 
 Server actions (`/__x/actions/*`) and other mutating endpoints are protected
 by two independent checks:
-
 1. **Origin/Referer verification (always on)**: cross-site `POST` requests
    whose `Origin` (or `Referer`) doesn't match the app's own origin are
    rejected. This alone stops the vast majority of CSRF attempts with zero setup.
@@ -124,7 +123,6 @@ connects lazily on first use. Expired buckets are swept automatically.
 **Only variables prefixed `THEXJS_PUBLIC_` may appear in client-shipped code.**
 Anything else referenced from a client bundle fails the build with an
 `EnvLeakageError`, enforced two ways:
-
 1. **Build-time interception**: client imports of `src/actions/*` server
    functions are rewritten to `fetch()` wrappers before the client bundler
    ever reads the real source, so secrets in action bodies are structurally
@@ -159,7 +157,6 @@ STRIPE_SECRET_KEY=sk_live_...
 (username/password) and OAuth2 (including a GitHub preset) providers, session
 stores on the data layer (SQLite/Postgres), and a catch-all API handler. Its
 security properties:
-
 - **Passwords** — hashed with Argon2id via `Bun.password` (`hashPassword` /
   `verifyPassword`). Never store plaintext.
 - **Session tokens** — opaque random 128-bit strings. Only an HMAC-SHA256
@@ -194,7 +191,10 @@ export default defineConfig({
   observability: {
     health: {
       checks: {
-        database: () => db.select`SELECT 1`().then(() => true).catch(() => false),
+        database: () =>
+          db.select`SELECT 1`()
+            .then(() => true)
+            .catch(() => false),
       },
     },
   },
@@ -220,7 +220,6 @@ Fly checks, Railway healthchecks).
 Please **do not** open a public issue for security problems. Email the
 maintainer at the address in the repository profile, or open a GitHub
 Security Advisory via the repo's **Security** tab (private). Include:
-
 - A description of the issue and its impact.
 - Steps to reproduce (minimal code/config).
 - Whether it affects a published package version.
@@ -230,12 +229,12 @@ disclosure flow.
 
 ### Response-time SLA
 
-| Milestone | Target |
-|---|---|
-| Acknowledge receipt | within **48 hours** |
-| Initial triage (severity assessment + confirmation) | within **5 business days** |
-| Fix available for Critical/High (with a workaround if a full fix takes longer) | within **30 days** of confirmation |
-| Fix available for Medium/Low | at the next scheduled release, or **60 days** for Low |
+| Milestone                                                                      | Target                                                |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------- |
+| Acknowledge receipt                                                            | within **48 hours**                                   |
+| Initial triage (severity assessment + confirmation)                            | within **5 business days**                            |
+| Fix available for Critical/High (with a workaround if a full fix takes longer) | within **30 days** of confirmation                    |
+| Fix available for Medium/Low                                                   | at the next scheduled release, or **60 days** for Low |
 
 If a milestone cannot be met we'll say so and give a revised date — we'd rather
 under-promise than go silent.
@@ -248,17 +247,16 @@ client/server boundary (browser-visible code, `/__x/actions/*`, image proxy,
 auth/session handling), so issues are rated by what a remote or cross-site
 attacker can actually do, not by source-level severity alone.
 
-| Severity | CVSS | Examples in this codebase |
-|---|---|---|
-| **Critical** | 9.0–10.0 | Remote code execution; auth bypass that grants access without credentials; secret disclosure in client bundles |
-| **High** | 7.0–8.9 | Server-side request forgery via the image proxy; cross-site request forgery on auth endpoints; session token forgery/leak |
-| **Medium** | 4.0–6.9 | Reflected/stored XSS with mitigations; information disclosure of non-secret data; rate-limit bypass |
-| **Low** | 0.1–3.9 | Logging of sensitive fields; minor header misconfigurations; DoS under unusual load |
+| Severity     | CVSS     | Examples in this codebase                                                                                                 |
+| ------------ | -------- | ------------------------------------------------------------------------------------------------------------------------- |
+| **Critical** | 9.0–10.0 | Remote code execution; auth bypass that grants access without credentials; secret disclosure in client bundles            |
+| **High**     | 7.0–8.9  | Server-side request forgery via the image proxy; cross-site request forgery on auth endpoints; session token forgery/leak |
+| **Medium**   | 4.0–6.9  | Reflected/stored XSS with mitigations; information disclosure of non-secret data; rate-limit bypass                       |
+| **Low**      | 0.1–3.9  | Logging of sensitive fields; minor header misconfigurations; DoS under unusual load                                       |
 
 ### Coordinated disclosure
 
 We ask reporters to keep issues private until we've shipped a fix:
-
 - **90 days** of coordinated disclosure before public disclosure, **negotiable
   to shorter** for issues under active exploitation (we'll coordinate a
   disclosure date with you).
@@ -271,7 +269,6 @@ We ask reporters to keep issues private until we've shipped a fix:
 The framework follows the versioning policy in `VERSIONING.md` — `@thexjs/*`
 packages ship in lockstep on one versioning PR per cycle. Security fixes are
 subject to the same backport rule:
-
 - **Latest major**: all security fixes ship in the next patch/minor release.
 - **Previous major**: critical/high fixes are backported as patch releases for
   **12 months** after the newer major ships, or until the older major is

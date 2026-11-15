@@ -27,7 +27,7 @@
 ### Patch Changes
 
 - 65c03ea: `x start`: add an `error` event listener on the spawned `bun` process so that a missing `bun` on `PATH` prints a friendly installation message instead of a raw ENOENT stack trace.
-  
+
   `x dev`: add an `error` event listener on the Tailwind file watcher so that inotify exhaustion or directory removal logs a clear warning instead of silently dying.
 - 2c1bc35: Document the intentional exit-code asymmetry: bare `x` exits 1 (usage error), `x --help` exits 0 (explicit request). Comment only, no behavior change.
 - 65c03ea: `x dev`: add an `error` event listener on the Tailwind file watcher so that inotify exhaustion or directory removal logs a clear warning instead of silently dying.
@@ -45,7 +45,6 @@
 ### Patch Changes
 
 - 3234581: Contain process-level crashes and route them to the error reporter (closes #85):
-  
   - New `installProcessCrashHandlers()` helper (exported from `@thexjs/core`)
     registers `uncaughtException`/`unhandledRejection` handlers that log the
     crash and report it through the configured error reporter, so a throw

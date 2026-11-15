@@ -1,4 +1,5 @@
 ---
+
 title: "Hello World"
 date: "2026-07-27"
 description: "Welcome to our blog — a space for thoughts on web development, design, and technology."

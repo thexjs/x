@@ -40,23 +40,22 @@ Run it via the CLI: `x dev` (or `bun run dev` if that's wired up in your `packag
 
 Given a `pagesDir`, `scanPages` walks the directory and maps files to routes:
 
-| File | Route |
-|---|---|
-| `src/pages/index.tsx` | `/` |
-| `src/pages/about.tsx` | `/about` |
-| `src/pages/blog/[slug].tsx` | `/blog/:slug` |
-| `src/pages/blog/[...rest].tsx` | `/blog/*` (catch-all) |
-| `src/pages/_layout.tsx` | Wraps every route in the same directory (and below) |
-| `src/pages/_middleware.ts` | Runs before matching routes in the same directory (and below) |
-| `src/pages/_404.tsx` | Custom not-found page |
-| `src/api/users.ts` | API route at `/api/users` (via `apiDir`) |
+| File                           | Route                                                         |
+| ------------------------------ | ------------------------------------------------------------- |
+| `src/pages/index.tsx`          | `/`                                                           |
+| `src/pages/about.tsx`          | `/about`                                                      |
+| `src/pages/blog/[slug].tsx`    | `/blog/:slug`                                                 |
+| `src/pages/blog/[...rest].tsx` | `/blog/*` (catch-all)                                         |
+| `src/pages/_layout.tsx`        | Wraps every route in the same directory (and below)           |
+| `src/pages/_middleware.ts`     | Runs before matching routes in the same directory (and below) |
+| `src/pages/_404.tsx`           | Custom not-found page                                         |
+| `src/api/users.ts`             | API route at `/api/users` (via `apiDir`)                      |
 
 Files and directories prefixed with `_` or `.` are never treated as routes.
 
 ### Route resolution order
 
 When several routes could match one URL, the most specific one wins:
-
 1. **Static (literal) routes beat dynamic ones** — `/users/new` is served by
    `pages/users/new.tsx`, never by `pages/users/[id].tsx`.
 2. **Single-segment params beat catch-alls** — `[slug].tsx` matches
@@ -128,7 +127,7 @@ import { Island } from "@thexjs/core";
 
 <Island name="LikeButton" client="visible">
   <LikeButton />
-</Island>
+</Island>;
 ```
 
 `client` accepts `"idle" | "visible" | "load"`, controlling when the island hydrates on the client. Everything outside an `<Island>` stays static/server-rendered HTML with no client JS shipped.
@@ -249,31 +248,31 @@ Only variables prefixed `THEXJS_PUBLIC_` may reach the browser. `@thexjs/env`'s 
 
 ## Exports reference
 
-| Export | Purpose |
-|---|---|
-| `defineConfig`, `createApp`, `CreateAppOptions`, `RouteProps`, `RevalidateOptions` | App setup / dev & runtime server |
-| `build`, `BuildOptions`, `RouteMode` | Static/server build step |
-| `renderPage`, `renderStaticPage`, `renderStreamingPage`, `LoaderArgs`, `LoaderReturn` | Lower-level render functions |
-| `scanRoutes`, `scanPages`, `scanApiDir`, `scanLayouts`, `scanLayoutsDir`, `scanMiddleware`, `scanNotFound`, `findLayoutChain`, `findMiddlewareChain`, `generateManifestSource`, `writeManifest` | Routing internals |
-| `Island`, `IslandProvider`, `IslandMode`, `IslandEntry` | Selective hydration |
-| `Image`, `ImageProps`, `buildSrcSet`, `SRCSET_WIDTHS`, `setImageRemoteHosts` | Optimized image component & srcset builder |
-| `Link`, `LinkProps` | Client-side navigation link component |
-| `createImageProxyHandler`, `ImageProxyOptions` | Remote image proxy handler, served at `/_x/image?url=...` |
-| `scanContent`, `renderMarkdown`, `escapeHtml`, `ContentEntry`, `Frontmatter` | Markdown content collections |
-| `composeMiddleware`, `MiddlewareContext`, `MiddlewareFn`, `MiddlewareNext` | Middleware |
-| `registerServerFunctions`, `generateServerFunctionClient`, `getServerFunctionHandler`, `resetServerFunctions` | Server functions/actions internals |
-| `connectSQLite`, `connectPostgres`, `runSQLiteMigrations`, `runPostgresMigrations` | Data layer |
-| `DefaultNotFound`, `renderErrorOverlay`, `CLIENT_NAV_SCRIPT` | Defaults / dev tooling |
-| `checkCsrf`, `verifyOrigin`, `verifyCsrfToken`, `generateCsrfToken`, `withCsrfCookie`, `CsrfOptions`, `CsrfResult` | CSRF protection |
-| `buildSecurityHeaders`, `applySecurityHeaders`, `SecurityHeadersOptions` | Security response headers (CSP/HSTS/etc.) |
-| `createRateLimiter`, `rateLimitMiddleware`, `RateLimitOptions`, `RateLimitResult`, `RateLimitStore`, `createRedisRateLimitStore` | Rate limiting (per-IP fixed window) |
-| `findLeakedEnvKeys`, `assertNoEnvLeakage`, `EnvLeakageError`, `PUBLIC_ENV_PREFIX` | Server/client env var isolation |
-| `logger`, `withRequestLogging`, `Logger`, `LogFields` | Structured JSON logging |
-| `setErrorReporter`, `getErrorReporter`, `reportException`, `createSentryReporter`, `createOtelReporter`, `combineReporters`, `noopReporter`, `ErrorReporter` | Error reporting (Sentry/OpenTelemetry hook) |
-| `setTracer`, `getTracer`, `runWithRequestSpan`, `tracePhase`, `tracePhaseSync`, `withRequestTracing`, `traceRequestId`, `dbTraceAttributes`, `TracerLike`, `TraceSpan` | Tracing / OpenTelemetry spans |
-| `createInMemoryMetrics`, `createOtlpMetricsReporter`, `withRequestMetrics`, `noopMetrics`, `MetricsReporter`, `CounterSeries`, `HistogramSeries` | Metrics collection (Prometheus/OTLP) |
-| `audit`, `setAuditSink`, `clientIpFromRequest`, `requestIdFromRequest`, `AuditSink`, `AuditEntry` | Audit logging |
-| `createHealthCheckHandler`, `HealthCheckOptions`, `HealthCheck`, `ReadinessResult` | `/healthz` and `/readyz` |
+| Export                                                                                                                                                                                          | Purpose                                                   |
+| ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| `defineConfig`, `createApp`, `CreateAppOptions`, `RouteProps`, `RevalidateOptions`                                                                                                              | App setup / dev & runtime server                          |
+| `build`, `BuildOptions`, `RouteMode`                                                                                                                                                            | Static/server build step                                  |
+| `renderPage`, `renderStaticPage`, `renderStreamingPage`, `LoaderArgs`, `LoaderReturn`                                                                                                           | Lower-level render functions                              |
+| `scanRoutes`, `scanPages`, `scanApiDir`, `scanLayouts`, `scanLayoutsDir`, `scanMiddleware`, `scanNotFound`, `findLayoutChain`, `findMiddlewareChain`, `generateManifestSource`, `writeManifest` | Routing internals                                         |
+| `Island`, `IslandProvider`, `IslandMode`, `IslandEntry`                                                                                                                                         | Selective hydration                                       |
+| `Image`, `ImageProps`, `buildSrcSet`, `SRCSET_WIDTHS`, `setImageRemoteHosts`                                                                                                                    | Optimized image component & srcset builder                |
+| `Link`, `LinkProps`                                                                                                                                                                             | Client-side navigation link component                     |
+| `createImageProxyHandler`, `ImageProxyOptions`                                                                                                                                                  | Remote image proxy handler, served at `/_x/image?url=...` |
+| `scanContent`, `renderMarkdown`, `escapeHtml`, `ContentEntry`, `Frontmatter`                                                                                                                    | Markdown content collections                              |
+| `composeMiddleware`, `MiddlewareContext`, `MiddlewareFn`, `MiddlewareNext`                                                                                                                      | Middleware                                                |
+| `registerServerFunctions`, `generateServerFunctionClient`, `getServerFunctionHandler`, `resetServerFunctions`                                                                                   | Server functions/actions internals                        |
+| `connectSQLite`, `connectPostgres`, `runSQLiteMigrations`, `runPostgresMigrations`                                                                                                              | Data layer                                                |
+| `DefaultNotFound`, `renderErrorOverlay`, `CLIENT_NAV_SCRIPT`                                                                                                                                    | Defaults / dev tooling                                    |
+| `checkCsrf`, `verifyOrigin`, `verifyCsrfToken`, `generateCsrfToken`, `withCsrfCookie`, `CsrfOptions`, `CsrfResult`                                                                              | CSRF protection                                           |
+| `buildSecurityHeaders`, `applySecurityHeaders`, `SecurityHeadersOptions`                                                                                                                        | Security response headers (CSP/HSTS/etc.)                 |
+| `createRateLimiter`, `rateLimitMiddleware`, `RateLimitOptions`, `RateLimitResult`, `RateLimitStore`, `createRedisRateLimitStore`                                                                | Rate limiting (per-IP fixed window)                       |
+| `findLeakedEnvKeys`, `assertNoEnvLeakage`, `EnvLeakageError`, `PUBLIC_ENV_PREFIX`                                                                                                               | Server/client env var isolation                           |
+| `logger`, `withRequestLogging`, `Logger`, `LogFields`                                                                                                                                           | Structured JSON logging                                   |
+| `setErrorReporter`, `getErrorReporter`, `reportException`, `createSentryReporter`, `createOtelReporter`, `combineReporters`, `noopReporter`, `ErrorReporter`                                    | Error reporting (Sentry/OpenTelemetry hook)               |
+| `setTracer`, `getTracer`, `runWithRequestSpan`, `tracePhase`, `tracePhaseSync`, `withRequestTracing`, `traceRequestId`, `dbTraceAttributes`, `TracerLike`, `TraceSpan`                          | Tracing / OpenTelemetry spans                             |
+| `createInMemoryMetrics`, `createOtlpMetricsReporter`, `withRequestMetrics`, `noopMetrics`, `MetricsReporter`, `CounterSeries`, `HistogramSeries`                                                | Metrics collection (Prometheus/OTLP)                      |
+| `audit`, `setAuditSink`, `clientIpFromRequest`, `requestIdFromRequest`, `AuditSink`, `AuditEntry`                                                                                               | Audit logging                                             |
+| `createHealthCheckHandler`, `HealthCheckOptions`, `HealthCheck`, `ReadinessResult`                                                                                                              | `/healthz` and `/readyz`                                  |
 
 ## License
 

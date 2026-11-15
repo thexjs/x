@@ -11,16 +11,16 @@ All `@thexjs/*` packages are released in **lockstep** on a single versioning
 PR per cycle: one changeset can bump several packages, and the changelogs are
 written together. There is no independent release cadence per package.
 
-| Package | Status | Current |
-|---|---|---|
-| `@thexjs/core` | `1.x` | 1.9.0 |
-| `@thexjs/auth` | `3.x` | 3.0.11 |
-| `@thexjs/env` | `1.x` | 1.1.0 |
-| `@thexjs/cli` | `1.x` | 1.1.7 |
-| `@thexjs/hooks` | `0.x` | 0.2.1 (pre-1.0) |
-| `@thexjs/mcp` | `0.x` | 0.1.1 (pre-1.0) |
-| `@thexjs/adapter-vercel` | `1.x` | 1.0.13 |
-| `create-thexjs-app` | `1.x` | 1.2.3 |
+| Package                  | Status | Current         |
+| ------------------------ | ------ | --------------- |
+| `@thexjs/core`           | `1.x`  | 1.9.0           |
+| `@thexjs/auth`           | `3.x`  | 3.0.11          |
+| `@thexjs/env`            | `1.x`  | 1.1.0           |
+| `@thexjs/cli`            | `1.x`  | 1.1.7           |
+| `@thexjs/hooks`          | `0.x`  | 0.2.1 (pre-1.0) |
+| `@thexjs/mcp`            | `0.x`  | 0.1.1 (pre-1.0) |
+| `@thexjs/adapter-vercel` | `1.x`  | 1.0.13          |
+| `create-thexjs-app`      | `1.x`  | 1.2.3           |
 
 `1.0.0` is the first tagged baseline. Before a package reaches `1.0.0`
 (currently `@thexjs/hooks` and `@thexjs/mcp`), bump conservatively: prefer
@@ -35,7 +35,6 @@ package's own `package.json` or npm listing for the live version.
 
 A change is **breaking (major)** if it requires a consumer to change code or
 config to keep working after upgrading:
-
 - Removing or renaming an exported API (`createApp`, `defineAuth`, ...) or a
   public type.
 - Changing a function's signature in a way that breaks existing callers
@@ -55,7 +54,6 @@ option) are `minor`.
 ## Deprecation window
 
 Public API is removed in stages so consumers can upgrade without a cliff:
-
 1. **Deprecation** — the export is marked `@deprecated` in its JSDoc and, where
    practical, logs a warning pointing at the replacement. Deprecated in
    version `N`.
@@ -72,7 +70,6 @@ not public API and can change at any time.
 ## Pre-releases (canary / next)
 
 Pre-release tags follow Changesets' `pre` mode:
-
 - `x version` runs with a `pre` tag of `next` for `@thexjs/*@next`, `canary`
   for `@thexjs/*@canary`. Pre-release version numbers are valid semver
   (e.g. `1.5.0-next.0`).
@@ -85,7 +82,6 @@ Pre-release tags follow Changesets' `pre` mode:
 ## The release flow (summary)
 
 `CONTRIBUTING.md#releasing` has the operational details. In short:
-
 1. Every PR touching `packages/*` adds a changeset (CI enforces this).
 2. Merge to `main` triggers `.github/workflows/release.yml`, which opens a
    "Version Packages" PR (bumps + changelogs).

@@ -34,7 +34,7 @@
 ### Patch Changes
 
 - e4ad9ee: fix(adapter): emit server-mode islands to disk and wire them into the render function
-  
+
   Server-mode pages (e.g. a home page using the GitHub loader) never shipped
   their client islands in production: `bundleRouteIslands()` built bundles in
   memory only, `adapter/scan.ts` precomputed resolved routes/actions before
@@ -42,7 +42,7 @@
   resulting production HTML referenced `/_islands/...` script files that were
   absent from Vercel's output, so `client="load"` islands (scroll-spy, analytics,
   hero scroll cue) never hydrated.
-  
+
   Now `bundleRouteIslandsToDisk()` writes the shared island bundle (and its
   module dependency graph) under the adapter's `islandsDir`, the adapter resolves
   them into the route's `islandScripts`, `generate-entry` emits them into the
@@ -56,7 +56,7 @@
 ### Patch Changes
 
 - e4ad9ee: fix(adapter): emit server-mode islands to disk and wire them into the render function
-  
+
   Server-mode pages (e.g. a home page using the GitHub loader) never shipped
   their client islands in production: `bundleRouteIslands()` built bundles in
   memory only, `adapter/scan.ts` precomputed resolved routes/actions before
@@ -64,7 +64,7 @@
   resulting production HTML referenced `/_islands/...` script files that were
   absent from Vercel's output, so `client="load"` islands (scroll-spy, analytics,
   hero scroll cue) never hydrated.
-  
+
   Now `bundleRouteIslandsToDisk()` writes the shared island bundle (and its
   module dependency graph) under the adapter's `islandsDir`, the adapter resolves
   them into the route's `islandScripts`, `generate-entry` emits them into the
@@ -78,14 +78,14 @@
 ### Patch Changes
 
 - 8875aea: fix(publish): stop the `workspace:*` protocol from leaking into published tarballs
-  
+
   `@thexjs/adapter-vercel@1.0.6` and `@thexjs/auth@3.0.5` were published with
   `"@thexjs/core": "workspace:*"` in their manifests. Bun publishes the
   `workspace:` range literally (it does not rewrite it like pnpm does), so
   consumers installing either package hit:
-  
+
       Workspace dependency "@thexjs/core" not found
-  
+
   Now the internal dependency is a real semver range (`^1.3.0`, matching how
   `@thexjs/cli` already declares it), so both packages install cleanly from
   npm. A repo-wide guard test (`scripts/workspace-protocol.test.ts`) plus a
