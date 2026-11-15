@@ -1,5 +1,22 @@
 # @thexjs/cli
 
+## 1.2.0
+
+### Minor Changes
+
+- 6d46c47: Add `x build --adapter node`, wiring the new `@thexjs/adapter-node` package into the CLI the same way `--adapter vercel` is wired to `@thexjs/adapter-vercel` (optional peer dependency, dynamic import with a friendly error if it isn't installed).
+
+### Patch Changes
+
+- c5a3f0f: Bump `tsup` devDependency to 9.0.0 across all packages, and `react`/`@types/react`/`react-dom`/`@types/react-dom` to 19.3.x where applicable (`@thexjs/core`, `@thexjs/hooks`, `@thexjs/adapter-vercel`, `@thexjs/cli`).
+- Updated dependencies [6d46c47]
+- Updated dependencies [c5a3f0f]
+- Updated dependencies [4b1e66b]
+- Updated dependencies [801184e]
+  - @thexjs/adapter-node@0.1.0
+  - @thexjs/core@1.10.0
+  - @thexjs/adapter-vercel@1.0.14
+
 ## 1.1.7
 
 ### Patch Changes
