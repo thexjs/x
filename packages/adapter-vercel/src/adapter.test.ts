@@ -99,6 +99,44 @@ describe("writeConfigJson", () => {
     expect(config.images.domains).toEqual(["cdn.example.com"]);
     expect(config.images.sizes).toBeDefined();
   });
+
+  // The render.func function gets the app's security headers from
+  // withResponseHardening at request time, but Vercel's filesystem routing
+  // serves static/ straight from the CDN, bypassing that function entirely.
+  // Without a native `headers` rule, every prerendered page would ship with
+  // no CSP/HSTS/X-Frame-Options -- unlike the identical app run directly.
+  test("emits default security headers for the static tier via a native headers rule", () => {
+    writeConfigJson(out, unitManifest());
+    const config = JSON.parse(readFileSync(join(out, "config.json"), "utf-8"));
+    expect(config.headers).toHaveLength(1);
+    expect(config.headers[0].source).toBe("/(.*)");
+    const byKey = Object.fromEntries(
+      config.headers[0].headers.map((h: { key: string; value: string }) => [h.key, h.value]),
+    );
+    // Headers.entries() always lowercases header names -- HTTP header names
+    // are case-insensitive, so this is exactly what Vercel's platform expects.
+    expect(byKey["x-frame-options"]).toBe("DENY");
+    expect(byKey["content-security-policy"]).toContain("default-src 'self'");
+    expect(byKey["strict-transport-security"]).toContain("max-age=");
+  });
+
+  test("omits the headers rule entirely when the app disables security headers", () => {
+    writeConfigJson(out, unitManifest({ security: { headers: false } }));
+    const config = JSON.parse(readFileSync(join(out, "config.json"), "utf-8"));
+    expect(config.headers).toBeUndefined();
+  });
+
+  test("respects a custom contentSecurityPolicy override", () => {
+    writeConfigJson(
+      out,
+      unitManifest({ security: { headers: { contentSecurityPolicy: "default-src 'none'" } } }),
+    );
+    const config = JSON.parse(readFileSync(join(out, "config.json"), "utf-8"));
+    const byKey = Object.fromEntries(
+      config.headers[0].headers.map((h: { key: string; value: string }) => [h.key, h.value]),
+    );
+    expect(byKey["content-security-policy"]).toBe("default-src 'none'");
+  });
 });
 
 describe("generateEntrySource", () => {
