@@ -39,6 +39,7 @@ writing.
 | Build toolchain (`x build`, `.x/` output) | stable | yes | `build.test.ts`, `cli.test.ts` |
 | Dev server (file watching, route rebuild) | beta | yes | `createApp-watcher.test.ts` |
 | Vercel adapter (output v3, config.json) | stable | yes | `adapter.test.ts` |
+| Node.js adapter (standalone server, Railway/Render/VPS) | beta | yes | `packages/adapter-node/src/adapter.test.ts` -- includes an end-to-end run under real `node` |
 | Layouts / middleware chains | stable | yes | `router.test.ts` (scanning), `createApp-request.test.ts` (middleware chains), `createApp-hydration.test.ts` (multi-layer rendering) |
 | Content collections (`scanContent`) | beta | yes | `content.test.ts`; frontmatter parsed as real YAML via Bun's native parser |
 | Data layer (SQLite/Postgres migrations) | beta | yes | `data/migrate.test.ts`; retry/backoff + TLS pinned by `data/postgres.test.ts`; SQLite WAL/FK options pinned by `data/sqlite.test.ts` |
@@ -83,7 +84,8 @@ Shipped items are listed with a pointer to where they landed.
   (`@thexjs/core/adapter`): build-manifest resolution, per-file transpile, and
   render-function bundling are reusable, so third-party adapters only implement
   their platform's output layer. `@thexjs/adapter-vercel` is the reference
-  implementation.
+  implementation; `@thexjs/adapter-node` (a standalone server for plain
+  Node.js hosts -- Railway, Render, a bare VPS) is the second.
 
 ### Tracking (remaining)
 
@@ -114,9 +116,12 @@ Shipped items are listed with a pointer to where they landed.
 
 ## Post-1.0 considerations
 
-- Node.js compatibility story (currently Bun-only by design).
 - Streaming SSR and partial hydration.
-- Middleware-first adapters beyond Vercel (Node, Cloudflare).
+- A Cloudflare Workers adapter -- `@thexjs/adapter-node` (ships a standalone
+  Node.js server; see the shipped-features table above) and the Vercel
+  adapter cover the two deploy shapes done so far, but Workers' runtime
+  constraints (no Node `net`/`fs`, a different streaming model) mean more of
+  `@thexjs/core` would need an edge-compatible path first.
 
 ## Not planned
 
