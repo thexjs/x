@@ -12,6 +12,7 @@ COPY packages/core/package.json packages/core/package.json
 COPY packages/cli/package.json packages/cli/package.json
 COPY packages/env/package.json packages/env/package.json
 COPY packages/adapter-vercel/package.json packages/adapter-vercel/package.json
+COPY packages/adapter-node/package.json packages/adapter-node/package.json
 COPY packages/auth/package.json packages/auth/package.json
 COPY packages/create-thexjs-app/package.json packages/create-thexjs-app/package.json
 COPY packages/hooks/package.json packages/hooks/package.json
