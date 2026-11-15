@@ -10,4 +10,4 @@
 "@thexjs/mcp": patch
 ---
 
-Bump `tsup` devDependency to 9.0.0 across all packages, and `react-dom`/`@types/react-dom` to 19.3.1 in `@thexjs/core`/`@thexjs/hooks`.
+Bump `tsup` devDependency to 9.0.0 across all packages, and `react`/`@types/react`/`react-dom`/`@types/react-dom` to 19.3.x where applicable (`@thexjs/core`, `@thexjs/hooks`, `@thexjs/adapter-vercel`, `@thexjs/cli`).

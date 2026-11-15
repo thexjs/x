@@ -22,7 +22,7 @@
   "devDependencies": {
     "@tailwindcss/cli": "^4.3.3",
     "@thexjs/cli": "workspace:*",
-    "@types/react": "^19.1.0",
+    "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "tailwindcss": "^4.3.3",
     "typescript": "^5.8.0"

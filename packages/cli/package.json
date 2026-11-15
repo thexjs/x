@@ -49,7 +49,7 @@
   "devDependencies": {
     "@thexjs/adapter-node": "0.0.0",
     "@thexjs/adapter-vercel": "^1.0.5",
-    "react": "^19.0.0",
+    "react": "^19.3.1",
     "tsup": "^9.0.0"
   }
 }
