@@ -1,5 +1,14 @@
 # @thexjs/auth
 
+## 3.0.12
+
+### Patch Changes
+
+- c5a3f0f: Bump `tsup` devDependency to 9.0.0 across all packages, and `react`/`@types/react`/`react-dom`/`@types/react-dom` to 19.3.x where applicable (`@thexjs/core`, `@thexjs/hooks`, `@thexjs/adapter-vercel`, `@thexjs/cli`).
+- Updated dependencies [c5a3f0f]
+- Updated dependencies [4b1e66b]
+  - @thexjs/core@1.10.0
+
 ## 3.0.11
 
 ### Patch Changes

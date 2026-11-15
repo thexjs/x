@@ -1,5 +1,16 @@
 # create-thexjs-app
 
+## 1.3.0
+
+### Minor Changes
+
+- 22443bd: `bun create thexjs-app --auth` now scaffolds real `@thexjs/auth` (a credentials provider against a hashed-password `users` table, HMAC'd sessions, brute-force-guarded sign-in, CSRF-checked actions) instead of a hardcoded `admin`/`admin` demo with plaintext comparison and no session expiry. Adds a `/signup` page and `POST /api/auth/signup` endpoint since `defineAuth` has no "create user" API of its own.
+
+### Patch Changes
+
+- 5cdbfba: Close a check-then-create race when scaffolding into an existing directory: the target directory is now created atomically and a directory filled by a concurrent run is rejected instead of being written into.
+- c5a3f0f: Bump `tsup` devDependency to 9.0.0 across all packages, and `react`/`@types/react`/`react-dom`/`@types/react-dom` to 19.3.x where applicable (`@thexjs/core`, `@thexjs/hooks`, `@thexjs/adapter-vercel`, `@thexjs/cli`).
+
 ## 1.2.3
 
 ### Patch Changes

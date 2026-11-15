@@ -1,5 +1,15 @@
 # @thexjs/core
 
+## 1.10.0
+
+### Minor Changes
+
+- 4b1e66b: Add an opt-in `requestTimeoutMs` option to `createApp`: a handler that exceeds the budget returns 504 Gateway Timeout (reported via the configured error reporter/metrics) instead of being able to stall every other request in the process indefinitely. Unset by default -- no behavior change unless you opt in.
+
+### Patch Changes
+
+- c5a3f0f: Bump `tsup` devDependency to 9.0.0 across all packages, and `react`/`@types/react`/`react-dom`/`@types/react-dom` to 19.3.x where applicable (`@thexjs/core`, `@thexjs/hooks`, `@thexjs/adapter-vercel`, `@thexjs/cli`).
+
 ## 1.9.0
 
 ### Minor Changes
