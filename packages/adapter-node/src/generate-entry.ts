@@ -19,9 +19,23 @@ export function generateEntrySource(
 // Unlike Vercel's adapter, a generic Node deployment can't assume any
 // specific proxy sits in front of it, so this is explicit opt-in (see
 // NodeAdapterOptions.trustProxy) rather than always-on.
-import { configureTrustedProxy } from "@thexjs/core";
+import { buildSecurityHeaders, configureTrustedProxy } from "@thexjs/core";
 const __x_trustProxy = ${JSON.stringify(options.trustProxy)};
 if (__x_trustProxy) configureTrustedProxy({ trustForwardedHeaders: true });
+
+// -- Static-asset security headers -----------------------------------------
+// __x_app.fetch() (below) applies the app's configured security headers to
+// every response it handles, including its own static-asset route -- but
+// static GET/HEAD requests here are served directly, before __x_app.fetch()
+// ever runs (see the request handler below), so they'd otherwise ship with
+// none of that. Build the same headers once, from the same __x_security
+// config the generated createApp() call above already received, so a static
+// HTML/asset response gets the identical CSP/HSTS/X-Frame-Options/etc. a
+// server-rendered response would. No per-request CSP nonce is available for
+// a precomputed static file, matching how any other no-nonce response
+// (405s, 500s, etc.) already behaves elsewhere in the framework.
+const __x_staticHeaders =
+  __x_security.headers === false ? null : buildSecurityHeaders(__x_security.headers || {});
 
 import { createServer } from "node:http";
 import { createReadStream, existsSync, statSync } from "node:fs";
@@ -92,6 +106,9 @@ function serveStaticFile(filePath, res) {
   const type = __x_mimeTypes[extname(filePath).toLowerCase()] ?? "application/octet-stream";
   res.statusCode = 200;
   res.setHeader("Content-Type", type);
+  if (__x_staticHeaders) {
+    for (const [key, value] of __x_staticHeaders) res.setHeader(key, value);
+  }
   createReadStream(filePath).pipe(res);
 }
 
