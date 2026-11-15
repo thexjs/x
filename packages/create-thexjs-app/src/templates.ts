@@ -133,6 +133,20 @@ export function ensureDir(path: string): void {
   if (!existsSync(path)) mkdirSync(path, { recursive: true });
 }
 
+// Single check-then-create point for the project root. `mkdir` without
+// `recursive` is atomic: if a concurrent run created the directory first, it
+// fails with EEXIST and we re-check whether it is non-empty.
+export function createTargetDir(path: string): void {
+  try {
+    mkdirSync(path, { recursive: false });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+    if (readdirSync(path).length > 0) {
+      throw new Error(`Directory "${path}" already exists and is not empty.`);
+    }
+  }
+}
+
 export function mergeTree(src: string, dest: string): void {
   ensureDir(dest);
   for (const entry of readdirSync(src)) {
