@@ -15,19 +15,19 @@ Requires React 18 or 19.
 
 ## Hooks
 
-| Hook | Purpose |
-|---|---|
-| `useDebounce(value, delayMs)` | Debounced value for search inputs etc. |
-| `useLocalStorage(key, initial)` | localStorage-backed state, syncs across tabs via the `storage` event |
-| `useMediaQuery(query)` | Boolean from `matchMedia`; `false` on the server, hydrates on mount |
-| `useIntersectionObserver(ref, options)` | Intersection entry for lazy-loading / infinite scroll / on-view analytics |
-| `useEventListener(event, handler, target?)` | Typed `addEventListener` with automatic cleanup |
-| `useClickOutside(ref, handler)` | Pointer-down outside a ref (dropdowns/modals) |
-| `usePrevious(value)` | Value from the previous render |
-| `useCopyToClipboard()` | `[copiedText, copy]`; async Clipboard API + `execCommand` fallback |
-| `useOnlineStatus()` | `navigator.onLine` + `online`/`offline` listeners |
-| `useServerAction(fn)` | `{ data, error, isPending }` + `run` over a server-function client |
-| `useForm(initialValues, validate)` | Lightweight form state + validation (works with zod, valibot, or hand-written validators) |
+| Hook                                        | Purpose                                                                                   |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `useDebounce(value, delayMs)`               | Debounced value for search inputs etc.                                                    |
+| `useLocalStorage(key, initial)`             | localStorage-backed state, syncs across tabs via the `storage` event                      |
+| `useMediaQuery(query)`                      | Boolean from `matchMedia`; `false` on the server, hydrates on mount                       |
+| `useIntersectionObserver(ref, options)`     | Intersection entry for lazy-loading / infinite scroll / on-view analytics                 |
+| `useEventListener(event, handler, target?)` | Typed `addEventListener` with automatic cleanup                                           |
+| `useClickOutside(ref, handler)`             | Pointer-down outside a ref (dropdowns/modals)                                             |
+| `usePrevious(value)`                        | Value from the previous render                                                            |
+| `useCopyToClipboard()`                      | `[copiedText, copy]`; async Clipboard API + `execCommand` fallback                        |
+| `useOnlineStatus()`                         | `navigator.onLine` + `online`/`offline` listeners                                         |
+| `useServerAction(fn)`                       | `{ data, error, isPending }` + `run` over a server-function client                        |
+| `useForm(initialValues, validate)`          | Lightweight form state + validation (works with zod, valibot, or hand-written validators) |
 
 ## Example
 

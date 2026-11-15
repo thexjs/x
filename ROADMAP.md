@@ -7,7 +7,6 @@ file is the honest scoreboard, not a marketing plan.
 
 The project is in **maintenance mode** while the author is busy with the
 college. What that means:
-
 - **Feature work is frozen.** The existing surface is the surface; new ideas
   go to the issue board for later, not into `main` this season.
 - **Community-run.** The repo is set up for contributors: issues are labeled
@@ -26,26 +25,27 @@ What you can rely on vs. what can still move. "Tested" means the behavior is
 pinned by an automated test in `packages/*/src/*.test.ts` at the time of
 writing.
 
-| Area | Status | Tested | Notes |
-|---|---|---|---|
-| File-based routing (scan, params, 404) | stable | yes | `router.test.ts`, `createApp-request.test.ts` |
-| SSR / static rendering (`mode`) | stable | yes | `phase3.test.ts`, `createApp-request.test.ts` |
-| API routes (method dispatch, 405) | stable | yes | `createApp-request.test.ts` |
-| Server functions (dispatch, CSRF) | stable | yes | `server-functions.test.ts` |
-| Security headers / rate limiting | stable | yes | `security/security.test.ts`, `security/rate-limit-redis.test.ts` |
-| Env-leak guard (server-only env in client code) | stable | yes | `env-leak.test.ts` (prod fails loudly; dev stub + 🔒 warning) |
-| Image proxy (SSRF allow-list) | stable | yes | `images/proxy.test.ts` |
-| Env validation (`@thexjs/env`) | stable | yes | `packages/env/src/index.test.ts` |
-| Build toolchain (`x build`, `.x/` output) | stable | yes | `build.test.ts`, `cli.test.ts` |
-| Dev server (file watching, route rebuild) | beta | yes | `createApp-watcher.test.ts` |
-| Vercel adapter (output v3, config.json) | stable | yes | `adapter.test.ts` |
-| Layouts / middleware chains | stable | yes | `router.test.ts` (scanning), `createApp-request.test.ts` (middleware chains), `createApp-hydration.test.ts` (multi-layer rendering) |
-| Content collections (`scanContent`) | beta | yes | `content.test.ts`; frontmatter parsed as real YAML via Bun's native parser |
-| Data layer (SQLite/Postgres migrations) | beta | yes | `data/migrate.test.ts`; retry/backoff + TLS pinned by `data/postgres.test.ts`; SQLite WAL/FK options pinned by `data/sqlite.test.ts` |
-| Auth (`@thexjs/auth`) | stable | yes | `auth.test.ts` + `auth-failures.test.ts` (store outage, store swap, generic OAuth2) + `hardening.test.ts` (brute-force, PKCE, session revocation) + `rbac.test.ts` (roles/permissions) |
-| Islands / client hydration | beta | yes | build emits islands; runtime hydration pinned by `island-bundle.test.ts` (mount, SSR round-trip, event wiring) + `createApp-hydration.test.ts` + `render-stream.test.ts` |
-| Content-MDX | experimental | no | `.mdx` support exists but is the least exercised surface |
-| Observability (health/readyz, metrics) | beta | yes | health in `createApp-request.test.ts`; metrics in `observability/metrics.test.ts`; reporter flushing untested |
+| Area                                                    | Status       | Tested | Notes                                                                                                                                                                                  |
+| ------------------------------------------------------- | ------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| File-based routing (scan, params, 404)                  | stable       | yes    | `router.test.ts`, `createApp-request.test.ts`                                                                                                                                          |
+| SSR / static rendering (`mode`)                         | stable       | yes    | `phase3.test.ts`, `createApp-request.test.ts`                                                                                                                                          |
+| API routes (method dispatch, 405)                       | stable       | yes    | `createApp-request.test.ts`                                                                                                                                                            |
+| Server functions (dispatch, CSRF)                       | stable       | yes    | `server-functions.test.ts`                                                                                                                                                             |
+| Security headers / rate limiting                        | stable       | yes    | `security/security.test.ts`, `security/rate-limit-redis.test.ts`                                                                                                                       |
+| Env-leak guard (server-only env in client code)         | stable       | yes    | `env-leak.test.ts` (prod fails loudly; dev stub + 🔒 warning)                                                                                                                          |
+| Image proxy (SSRF allow-list)                           | stable       | yes    | `images/proxy.test.ts`                                                                                                                                                                 |
+| Env validation (`@thexjs/env`)                          | stable       | yes    | `packages/env/src/index.test.ts`                                                                                                                                                       |
+| Build toolchain (`x build`, `.x/` output)               | stable       | yes    | `build.test.ts`, `cli.test.ts`                                                                                                                                                         |
+| Dev server (file watching, route rebuild)               | beta         | yes    | `createApp-watcher.test.ts`                                                                                                                                                            |
+| Vercel adapter (output v3, config.json)                 | stable       | yes    | `adapter.test.ts`                                                                                                                                                                      |
+| Node.js adapter (standalone server, Railway/Render/VPS) | beta         | yes    | `packages/adapter-node/src/adapter.test.ts` -- includes an end-to-end run under real `node`                                                                                            |
+| Layouts / middleware chains                             | stable       | yes    | `router.test.ts` (scanning), `createApp-request.test.ts` (middleware chains), `createApp-hydration.test.ts` (multi-layer rendering)                                                    |
+| Content collections (`scanContent`)                     | beta         | yes    | `content.test.ts`; frontmatter parsed as real YAML via Bun's native parser                                                                                                             |
+| Data layer (SQLite/Postgres migrations)                 | beta         | yes    | `data/migrate.test.ts`; retry/backoff + TLS pinned by `data/postgres.test.ts`; SQLite WAL/FK options pinned by `data/sqlite.test.ts`                                                   |
+| Auth (`@thexjs/auth`)                                   | stable       | yes    | `auth.test.ts` + `auth-failures.test.ts` (store outage, store swap, generic OAuth2) + `hardening.test.ts` (brute-force, PKCE, session revocation) + `rbac.test.ts` (roles/permissions) |
+| Islands / client hydration                              | beta         | yes    | build emits islands; runtime hydration pinned by `island-bundle.test.ts` (mount, SSR round-trip, event wiring) + `createApp-hydration.test.ts` + `render-stream.test.ts`               |
+| Content-MDX                                             | experimental | no     | `.mdx` support exists but is the least exercised surface                                                                                                                               |
+| Observability (health/readyz, metrics)                  | beta         | yes    | health in `createApp-request.test.ts`; metrics in `observability/metrics.test.ts`; reporter flushing untested                                                                          |
 
 ## Coverage debt (high → low priority)
 
@@ -83,7 +83,8 @@ Shipped items are listed with a pointer to where they landed.
   (`@thexjs/core/adapter`): build-manifest resolution, per-file transpile, and
   render-function bundling are reusable, so third-party adapters only implement
   their platform's output layer. `@thexjs/adapter-vercel` is the reference
-  implementation.
+  implementation; `@thexjs/adapter-node` (a standalone server for plain
+  Node.js hosts -- Railway, Render, a bare VPS) is the second.
 
 ### Tracking (remaining)
 
@@ -114,9 +115,12 @@ Shipped items are listed with a pointer to where they landed.
 
 ## Post-1.0 considerations
 
-- Node.js compatibility story (currently Bun-only by design).
 - Streaming SSR and partial hydration.
-- Middleware-first adapters beyond Vercel (Node, Cloudflare).
+- A Cloudflare Workers adapter -- `@thexjs/adapter-node` (ships a standalone
+  Node.js server; see the shipped-features table above) and the Vercel
+  adapter cover the two deploy shapes done so far, but Workers' runtime
+  constraints (no Node `net`/`fs`, a different streaming model) mean more of
+  `@thexjs/core` would need an edge-compatible path first.
 
 ## Not planned
 

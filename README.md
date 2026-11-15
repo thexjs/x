@@ -63,6 +63,7 @@ packages/env                  typed env variable validation
 packages/auth                 credentials + OAuth2/GitHub auth, sessions, CSRF
 packages/hooks                client-side hook helpers (useDebounce, useForm, useServerAction, ...)
 packages/adapter-vercel       Vercel Build Output API adapter
+packages/adapter-node         generic Node.js adapter (Railway, Render, a bare VPS)
 packages/create-thexjs-app    the scaffolder (bun create thexjs-app@latest)
 packages/mcp                  MCP server so AI agents get x's conventions right
 examples/default              minimal starter
@@ -186,7 +187,6 @@ That swap happens in a `Bun.build()` plugin (`actionsRewritePlugin`) that interc
 ### Client/server boundary in practice
 
 Getting this boundary right (making sure `DATABASE_URL` or `STRIPE_SECRET_KEY` never end up in a browser bundle) was the hardest part of building this. Two things enforce it:
-
 1. **Build-time interception**: the `actionsRewritePlugin` above means server-function bodies are never even parsed by the client-target bundler.
 2. **A leak scanner as a safety net**: after each island bundle is built, `assertNoEnvLeakage()` runs a regex scan (not an AST pass worth being precise about that) over the final bundled JS text, looking for `process.env.X`, `Bun.env.X`, or `import.meta.env.X`. Anything not prefixed `THEXJS_PUBLIC_` fails the build with an `EnvLeakageError`. It's a simple, fast check on the compiled output rather than a structural understanding of the code, so it catches the common cases but isn't meant to be un-fool-able (e.g. `Bun["e" + "nv"]` would slip past a naive regex) the interception above is what actually makes the leak impossible, the scanner just double-checks it.
 
@@ -215,7 +215,7 @@ Every `<a>` tag gets SPA-style client-side navigation and hover prefetch automat
 ```tsx
 import { Link, createImageProxyHandler } from "@thexjs/core";
 
-<Link href="/docs">Docs</Link>
+<Link href="/docs">Docs</Link>;
 
 const imageProxy = createImageProxyHandler({ remoteHosts: ["cdn.example.com"] });
 ```
@@ -224,7 +224,6 @@ const imageProxy = createImageProxyHandler({ remoteHosts: ["cdn.example.com"] })
 
 `@thexjs/core` ships an `<Image>` component that gets the parts of
 `next/image` that earn their keep without a build-time optimization pipeline:
-
 - **Responsive `srcset`/`sizes`** — remote images render width variants
   (`&w=320` … `&w=3840`) through the `/_x/image` proxy.
 - **Auto remote-routing** — an absolute `src` whose host is in
@@ -248,7 +247,7 @@ import { Image } from "@thexjs/core";
   height={900}
   priority
   sizes="(max-width: 768px) 100vw, 50vw"
-/>
+/>;
 ```
 
 `alt` is required. Format `<picture>` sources and resizing are reserved for a
@@ -269,7 +268,9 @@ import { defineAuth, createSQLiteSessionStore } from "@thexjs/auth";
 export const auth = defineAuth({
   secret: process.env.AUTH_SECRET!,
   store: createSQLiteSessionStore(),
-  providers: [{ id: "github", name: "GitHub", type: "oauth", clientId: "...", clientSecret: "..." }],
+  providers: [
+    { id: "github", name: "GitHub", type: "oauth", clientId: "...", clientSecret: "..." },
+  ],
 });
 
 // api/auth/[...auth].ts — forward GET/POST to auth.handleRequest(req)
@@ -311,7 +312,6 @@ Most people building on x, including experienced devs, lean on AI coding
 agents to get things done — and a general-purpose agent will confidently
 write Next.js/Remix/TanStack Start syntax that looks right but isn't x's.
 Two things ground agents in x's actual conventions instead:
-
 - **`@thexjs/mcp`** — an MCP server with `list_topics` / `get_docs` /
   `search_docs` / `scaffold_file` tools. Every project scaffolded with
   `bun create thexjs-app@latest` wires it up automatically (`.mcp.json` for
@@ -326,7 +326,6 @@ Two things ground agents in x's actual conventions instead:
 Packages follow [semver](VERSIONING.md) and are pre-1.0 in spirit: the
 public API is still settling, so expect breaking changes between minor
 releases. Pin exact versions if stability matters to you.
-
 - Releases are managed with **Changesets**. Every PR touching a `packages/*`
   package adds a changeset (`bun changeset`), which bumps versions and writes
   changelogs when merged to `main`.

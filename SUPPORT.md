@@ -11,16 +11,16 @@ response and backports) and does not override either.
 All `@thexjs/*` packages ship in **lockstep** on one versioning cycle
 (see `VERSIONING.md`). There is no independent release cadence per package:
 
-| Package | Status | Support window |
-|---|---|---|
-| `@thexjs/core` | 1.x | active |
-| `@thexjs/auth` | 3.x | active |
-| `@thexjs/env` | 1.x | active |
-| `@thexjs/adapter-vercel` | 1.x | active |
-| `@thexjs/cli` | 1.x | active |
-| `create-thexjs-app` | 1.x | active |
-| `@thexjs/hooks` | 0.x (pre-1.0) | active, stable API coming |
-| `@thexjs/mcp` | 0.x (pre-1.0) | active, stable API coming |
+| Package                  | Status        | Support window            |
+| ------------------------ | ------------- | ------------------------- |
+| `@thexjs/core`           | 1.x           | active                    |
+| `@thexjs/auth`           | 3.x           | active                    |
+| `@thexjs/env`            | 1.x           | active                    |
+| `@thexjs/adapter-vercel` | 1.x           | active                    |
+| `@thexjs/cli`            | 1.x           | active                    |
+| `create-thexjs-app`      | 1.x           | active                    |
+| `@thexjs/hooks`          | 0.x (pre-1.0) | active, stable API coming |
+| `@thexjs/mcp`            | 0.x (pre-1.0) | active, stable API coming |
 
 Pre-`1.0.0` packages (currently `@thexjs/hooks` and `@thexjs/mcp`) bump
 conservatively: prefer `patch`, avoid surprise `minor`s (`VERSIONING.md`).
@@ -29,7 +29,6 @@ conservatively: prefer `patch`, avoid surprise `minor`s (`VERSIONING.md`).
 
 A change is **breaking (major)** if upgrading forces a consumer to change code
 or config:
-
 - Removing or renaming an exported API or public type.
 - Changing a function signature in a way that breaks existing callers.
 - Changing the shape of persisted data that is not migrated.
@@ -57,7 +56,6 @@ drop-in upgrade unless a changelog entry explicitly says otherwise.
 ## What "supported" means in practice
 
 For the latest major:
-
 - **Response to security issues** — per the SLA table in `SECURITY.md`
   (acknowledge within 48h; critical/high fix within 30 days of confirmation).
 - **Bug fixes** — tracked as issues; severity and scheduling are at the

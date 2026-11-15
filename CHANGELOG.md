@@ -2,7 +2,6 @@
 
 Release notes are maintained by [Changesets](https://changesets.github.io) per
 package. Each `packages/*` directory keeps its own authoritative changelog:
-
 - [`@thexjs/core`](packages/core/CHANGELOG.md)
 - [`@thexjs/auth`](packages/auth/CHANGELOG.md)
 - [`@thexjs/env`](packages/env/CHANGELOG.md)

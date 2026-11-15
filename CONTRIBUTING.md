@@ -16,6 +16,7 @@ packages/cli                 x dev / x build / x start
 packages/env                 type-safe env validation
 packages/hooks               client-side React hook helpers
 packages/adapter-vercel      Vercel Build Output API adapter
+packages/adapter-node        generic Node.js adapter (Railway, Render, a bare VPS)
 packages/create-thexjs-app   `bun create thexjs-app@latest` scaffolder
 packages/mcp                 MCP server exposing x's docs/conventions for coding agents
 examples/*                   dogfood apps (basic, blog, default, landing, saas)
@@ -24,7 +25,9 @@ examples/*                   dogfood apps (basic, blog, default, landing, saas)
 ## Prerequisites
 
 - [Bun](https://bun.sh) 1.3.x or later
-- Node.js is **not** used at any point in this repo
+- Node.js is **not** used to build or test this repo. `packages/adapter-node` targets Node.js as
+  a deploy runtime (its own tests spawn a real `node` process to verify the bundled output), but
+  that's the only place Node.js appears here -- everything else is Bun-only by design.
 
 ## Setup
 
@@ -54,7 +57,6 @@ okay later, not because I'm precious about git history.
 If you're new to the repo, start from the
 [`good first issue` / `help wanted` labels](https://github.com/thexjs/x/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 Each issue lists acceptance criteria and a regression test to add.
-
 - **Comment on the issue first** to claim it and avoid overlap.
 - PRs are reviewed on a best-effort weekly window (maintenance mode), so
   **small, test-backed PRs** are the fastest path through review — a focused
@@ -122,6 +124,7 @@ or write the file by hand under `.changeset/<random-name>.md`:
 
 ```md
 ---
+
 "@thexjs/core": patch
 "@thexjs/env": patch
 ---
@@ -136,7 +139,6 @@ deprecation window before removal, and how pre-release (canary/next) tags work.
 ### What happens on merge to main
 
 The `.github/workflows/release.yml` workflow runs on every push to `main`:
-
 1. Installs dependencies and runs `build:packages`, `typecheck`, `lint`, and
    `test`: the job fails if any of these fail, before anything is released.
 2. `changesets/action@v2` then:

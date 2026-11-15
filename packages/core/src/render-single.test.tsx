@@ -24,6 +24,7 @@ describe("renderPageOnce single-render determinism", () => {
     // scripts and markup disagree. Single-render touches the tree once, so the
     // script list and the markup must both reflect the same pass.
     let renders = 0;
+    // biome-ignore lint/correctness/noComponentHookFactories: intentional per-test closure over this test's `renders` counter.
     function Flip() {
       renders += 1;
       const name = renders === 1 ? "IslandA" : "IslandB";
@@ -88,6 +89,7 @@ describe("renderPage emits discovery-free HTML", () => {
 describe("renderStreamingPage lazy island footer", () => {
   test("resolves the island script list from the registry after the single render", async () => {
     let renders = 0;
+    // biome-ignore lint/correctness/noComponentHookFactories: intentional per-test closure over this test's `renders` counter.
     function Counter() {
       renders += 1;
       return createElement(

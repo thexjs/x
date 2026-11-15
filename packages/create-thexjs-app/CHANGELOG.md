@@ -22,7 +22,7 @@
   `@thexjs/cli` (`FALLBACK_CLI_VERSION`) when the npm registry lookup fails,
   instead of reusing the core fallback — an offline scaffold was pinning
   `@thexjs/cli` to whatever the core fallback happened to be.
-  
+
   Pure helpers were extracted into a side-effect-free `src/package-json.ts`
   (`buildPackageJson`, `resolveVersions`, and the `FALLBACK_*` constants) so the
   scaffolding logic is unit-testable without triggering the CLI entrypoint.
@@ -49,7 +49,6 @@
 ### Patch Changes
 
 - c8e7985: Fix bugs that shipped in freshly scaffolded apps:
-  
   - Add `@types/bun` to the base template devDependencies — the generated
     `tsconfig.json` sets `"types": ["bun"]`, but without the types package every
     scaffolded app failed typecheck with TS2688.
@@ -67,7 +66,6 @@
 ### Patch Changes
 
 - 369e737: Fix two issues in the generated projects produced by the scaffolder:
-
   - The `.gitignore` was silently missing from generated projects because npm
     strips files named `.gitignore` from published tarballs, even inside nested
     template directories. Templates now ship an `_gitignore` file that the
@@ -85,7 +83,6 @@
   interactive feature selection (Next.js-style), powered by `@clack/prompts`.
   Users choose from Tailwind CSS, shadcn/ui, a SQLite-backed demo auth, and
   content collections instead of picking a full pre-built app template.
-
   - Generated projects now auto-initialize a git repo and ship a complete
     `.gitignore`.
   - New JSON / non-interactive CLI flags for scripting: `--tailwind`,

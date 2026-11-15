@@ -1,18 +1,19 @@
 ---
+
 name: framework-stability-review
 description: >
-  Use this skill whenever asked to do a "final review", "deep review",
-  "stability review", or "pre-merge review" of one or more pull requests
-  against this repo (thexjs "x" framework) — especially when multiple PRs
-  from parallel work are being merged around the same time. Do NOT treat a
-  green CI run as sufficient signal to invoke or skip this skill: green CI
-  only proves the tests that exist pass on the machines they ran on. This
-  skill exists specifically for the class of bug CI cannot catch: subtle
-  interactions between concurrently-developed changes, unverified
-  assumptions, silent behavior changes not covered by any test, and
-  cross-branch contamination. Trigger this any time the user asks to
-  "review", "check stability", "make sure nothing broke", or similarly,
-  regardless of CI status.
+Use this skill whenever asked to do a "final review", "deep review",
+"stability review", or "pre-merge review" of one or more pull requests
+against this repo (thexjs "x" framework) — especially when multiple PRs
+from parallel work are being merged around the same time. Do NOT treat a
+green CI run as sufficient signal to invoke or skip this skill: green CI
+only proves the tests that exist pass on the machines they ran on. This
+skill exists specifically for the class of bug CI cannot catch: subtle
+interactions between concurrently-developed changes, unverified
+assumptions, silent behavior changes not covered by any test, and
+cross-branch contamination. Trigger this any time the user asks to
+"review", "check stability", "make sure nothing broke", or similarly,
+regardless of CI status.
 ---
 
 # Framework Stability Review
@@ -70,7 +71,6 @@ potentially contaminated until the diff is read directly.
 ## Step 2 — Cross-PR interaction analysis
 
 When multiple PRs are open/being merged concurrently:
-
 1. Build a file-touch matrix: which files does each PR modify, and does
    any file appear in more than one PR's diff? Overlapping files are a
    MERGE-ORDER risk even if each PR is individually correct — the second
@@ -95,7 +95,6 @@ When multiple PRs are open/being merged concurrently:
 ## Step 3 — Read the diff for logic, not just presence of tests
 
 For each changed file, actually reason through:
-
 - **Correctness of the fix relative to the original bug.** Re-derive the
   bug from first principles using the actual issue description and the
   actual before/after code — don't just check that a test exists and

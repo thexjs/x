@@ -79,6 +79,14 @@ export default function Home() {
     expect(existsSync(join(FIXTURE_DIR, "dist-custom/server/index.ts"))).toBe(true);
   });
 
+  test("build --adapter node emits a standalone dist-node/ tree", () => {
+    const res = runCli(["build", "--cwd", FIXTURE_DIR, "--adapter", "node"]);
+    expect(res.status).toBe(0);
+    expect(existsSync(join(FIXTURE_DIR, "dist-node/static/index.html"))).toBe(true);
+    expect(existsSync(join(FIXTURE_DIR, "dist-node/server/index.mjs"))).toBe(true);
+    rmSync(join(FIXTURE_DIR, "dist-node"), { recursive: true, force: true });
+  });
+
   test("unknown adapter fails with a clear error", () => {
     const res = runCli(["build", "--cwd", FIXTURE_DIR, "--adapter", "bogus"]);
     expect(res.status).not.toBe(0);

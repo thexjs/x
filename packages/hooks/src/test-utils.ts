@@ -29,6 +29,7 @@ export function renderHook<Props, T>(
   const result: { current: T } = { current: undefined as T };
   let props: Props = initialProps;
 
+  // biome-ignore lint/correctness/noComponentHookFactories: intentional per-call test harness -- each renderHook() call needs its own closure over this call's mutable props/result.
   const Component = () => {
     result.current = use(props);
     return null;

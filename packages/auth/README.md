@@ -69,13 +69,13 @@ await hashPassword("correct horse battery staple");
 
 `handleRequest` routes the path below `api/auth`:
 
-| Route | Method | Purpose |
-|---|---|---|
-| `/api/auth/signin/<id>` | POST | credentials provider: `application/x-www-form-urlencoded` or `multipart` body with the provider's fields (e.g. `email`, `password`) |
-| `/api/auth/signin/<id>` | GET | OAuth2 provider: redirects the browser to the provider's authorization URL |
-| `/api/auth/callback/<id>` | GET | OAuth2 callback: exchanges the code, validates the state challenge, signs the user in |
-| `/api/auth/signout` | POST | revokes the session and clears the cookie |
-| `/api/auth/session` | GET | JSON `{ "user": { ... } }` or `401` |
+| Route                     | Method | Purpose                                                                                                                             |
+| ------------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `/api/auth/signin/<id>`   | POST   | credentials provider: `application/x-www-form-urlencoded` or `multipart` body with the provider's fields (e.g. `email`, `password`) |
+| `/api/auth/signin/<id>`   | GET    | OAuth2 provider: redirects the browser to the provider's authorization URL                                                          |
+| `/api/auth/callback/<id>` | GET    | OAuth2 callback: exchanges the code, validates the state challenge, signs the user in                                               |
+| `/api/auth/signout`       | POST   | revokes the session and clears the cookie                                                                                           |
+| `/api/auth/session`       | GET    | JSON `{ "user": { ... } }` or `401`                                                                                                 |
 
 A sign-in form POSTs to `/api/auth/signin/local`; after success the browser follows the `302` to `successRedirect` (default `/`). For OAuth, the button/link is just a GET to `/api/auth/signin/github`.
 
@@ -105,7 +105,7 @@ Set a **stable `secret`** in production. If omitted, a random per-process secret
 Both stores use a single `x_sessions` table and implement the `SessionStore` interface (`create`, `find`, `revoke`, `revokeAllForUser`) if you want to bring your own.
 
 ```ts
-createSQLiteSessionStore({ path: "data/auth.db" });   // default: data/auth.db
+createSQLiteSessionStore({ path: "data/auth.db" }); // default: data/auth.db
 createPostgresSessionStore(connectPostgres({ url: process.env.DATABASE_URL }));
 ```
 

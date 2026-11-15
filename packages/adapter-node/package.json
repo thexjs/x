@@ -1,0 +1,48 @@
+{
+  "name": "@thexjs/adapter-node",
+  "version": "0.0.0",
+  "description": "Generic Node.js adapter for the x framework -- build a standalone server.mjs that runs on plain Node.js (Railway, Render, Fly, a bare VPS), no Bun runtime required at deploy time.",
+  "keywords": [
+    "node",
+    "adapter",
+    "bun",
+    "react",
+    "framework",
+    "x"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean --target node18",
+    "prepublishOnly": "bun run build"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "dependencies": {
+    "@thexjs/core": "^1.9.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "tsup": "^9.0.0"
+  }
+}
