@@ -27,7 +27,7 @@ you run always needs to serve `static/` itself.
 
 1. Runs `@thexjs/core`'s normal `build()` to prerender every static-mode page/content
    entry and compile island bundles -- this becomes `static/`.
-2. Separately resolves every *server-mode* page, API route, layout, middleware file,
+2. Separately resolves every _server-mode_ page, API route, layout, middleware file,
    and server-action file **at build time** (reusing `@thexjs/core/adapter`'s SDK --
    the same one `@thexjs/adapter-vercel` composes), so nothing at request time depends
    on walking the filesystem or on a dynamic `import(path)` of a `.tsx` file.
@@ -54,8 +54,8 @@ await buildNodeOutput({
   actionsDir: "src/actions",
   contentDir: "content",
   outputDir: "dist-node", // default
-  port: 3000,             // default; overridden by $PORT at runtime
-  trustProxy: false,      // default -- see below
+  port: 3000, // default; overridden by $PORT at runtime
+  trustProxy: false, // default -- see below
 });
 ```
 

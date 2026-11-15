@@ -56,47 +56,47 @@ verified, not just written.
   `*` catch-all): covered by `router.test.ts`
 - [x] Generate a typed route manifest (params typed per route, not just
   `Record<string, string>`)
- : `createApp` writes `src/x-routes.ts` in dev mode with a `RouteMap` type
-    and a type-safe `href()` helper
+  : `createApp` writes `src/x-routes.ts` in dev mode with a `RouteMap` type
+  and a type-safe `href()` helper
 - [x] Nested layouts: wrap a page in its ancestor `_layout.tsx` chain
   (`_` prefix is already reserved and skipped by the scanner, just unused)
- : `scanLayouts` discovers `_layout.tsx` files, `findLayoutChain` builds the
-    ancestor chain for each route, and `createApp` wraps the page component
-    from innermost to outermost layout
+  : `scanLayouts` discovers `_layout.tsx` files, `findLayoutChain` builds the
+  ancestor chain for each route, and `createApp` wraps the page component
+  from innermost to outermost layout
 - [x] File watcher rebuilds the route tree on add/remove without a full
-  server restart (`--hot` reloads changed route *content* today, not new
-  route *files*)
- : `fs.watch` with `recursive: true` on the routes directory triggers a
-    route-tree rebuild (debounced 200 ms) and logs added/removed routes
+  server restart (`--hot` reloads changed route _content_ today, not new
+  route _files_)
+  : `fs.watch` with `recursive: true` on the routes directory triggers a
+  route-tree rebuild (debounced 200 ms) and logs added/removed routes
 
 ## Phase 2: Static rendering + islands (the Astro half)
 
 - [x] `export const mode = 'static'` on a route → prerendered at build time
- : `build()` reads the `mode` export; static routes are rendered with
-    `renderToStaticMarkup` and written to `dist/client/`
+  : `build()` reads the `mode` export; static routes are rendered with
+  `renderToStaticMarkup` and written to `dist/client/`
 - [x] Static build step: render each static route with `renderToStaticMarkup`,
   write to `dist/`
- : `packages/core/src/build.ts` includes `build()` that runs the full
-    static-export pipeline
+  : `packages/core/src/build.ts` includes `build()` that runs the full
+  static-export pipeline
 - [x] Content collections: `content/**/*.md(x)`, frontmatter parsing, each entry
   becomes a route (this is the blog/marketing use case)
- : `scanContent()` discovers markdown files, parses basic frontmatter,
-    maps file paths to routes; served in dev mode via `contentDir` option,
-    built to static HTML in `build()`
+  : `scanContent()` discovers markdown files, parses basic frontmatter,
+  maps file paths to routes; served in dev mode via `contentDir` option,
+  built to static HTML in `build()`
 - [x] Island marker (`<Island client="idle">` or similar): only marked components
   get a client JS bundle; everything else ships as plain HTML
- : `<Island>` component wraps children in `data-island` divs;
-    `IslandProvider` collects island entries during render; build generates
-    a stub JS chunk per island (real hydration module loading is next)
+  : `<Island>` component wraps children in `data-island` divs;
+  `IslandProvider` collects island entries during render; build generates
+  a stub JS chunk per island (real hydration module loading is next)
 - [x] Verify Bun's bundler code-splits each island into its own small chunk
- : `bundleRouteIslands()` in `build.ts` generates a client entry per route
-    that imports the route module and hydrates all `[data-island]` elements;
-    runs `bun build` (via `Bun.spawn`) as a child process to produce a
-    separate minified JS bundle per route's islands; bundle URL is injected
-    into the page HTML via `<script type="module">` tags.
-    Verified in `build.test.ts`: "island code-splitting" tests confirm
-    separate JS chunks exist in `dist/client/_islands/`, HTML contains the
-    script tag, and bundled output is valid JavaScript.
+  : `bundleRouteIslands()` in `build.ts` generates a client entry per route
+  that imports the route module and hydrates all `[data-island]` elements;
+  runs `bun build` (via `Bun.spawn`) as a child process to produce a
+  separate minified JS bundle per route's islands; bundle URL is injected
+  into the page HTML via `<script type="module">` tags.
+  Verified in `build.test.ts`: "island code-splitting" tests confirm
+  separate JS chunks exist in `dist/client/_islands/`, HTML contains the
+  script tag, and bundled output is valid JavaScript.
 
 ## Phase 3: SSR + server functions (the Next.js half)
 
@@ -140,41 +140,41 @@ verified, not just written.
 ## Phase 6: Data layer
 
 - [x] Thin helpers over Bun's built-in SQLite client for local dev
- : `packages/core/src/data/sqlite.ts`: `connectSQLite()` wraps `bun:sqlite`
-    with WAL mode and foreign keys enabled by default
+  : `packages/core/src/data/sqlite.ts`: `connectSQLite()` wraps `bun:sqlite`
+  with WAL mode and foreign keys enabled by default
 - [x] Same helpers over Bun's Postgres client for anything meant to ship
- : `packages/core/src/data/postgres.ts`: `connectPostgres()` wraps `Bun.sql()`
-    with `DATABASE_URL` env var fallback
+  : `packages/core/src/data/postgres.ts`: `connectPostgres()` wraps `Bun.sql()`
+  with `DATABASE_URL` env var fallback
 - [x] Pick one migration approach and write it down
- : `packages/core/src/data/migrate.ts`: `runSQLiteMigrations()` and
-    `runPostgresMigrations()` run `.sql` files sorted by name, tracked in a
-    `_x_migrations` table (applied once, skipped on re-run)
+  : `packages/core/src/data/migrate.ts`: `runSQLiteMigrations()` and
+  `runPostgresMigrations()` run `.sql` files sorted by name, tracked in a
+  `_x_migrations` table (applied once, skipped on re-run)
 - [x] One auth/session example using the above
- : `examples/basic/src/data/auth.ts`: session CRUD backed by SQLite + migrations
- : `examples/basic/src/routes/dashboard/_middleware.ts`: redirects to `/login`
-    when session cookie is missing
- : `examples/basic/src/routes/api/auth/login.ts`: POST handler validates
-    credentials (demo: admin/admin) and sets session cookie
- : `examples/basic/src/routes/api/auth/logout.ts`: POST handler clears session
- : `examples/basic/src/routes/login.tsx`: login form page (JS-free, plain HTML)
+  : `examples/basic/src/data/auth.ts`: session CRUD backed by SQLite + migrations
+  : `examples/basic/src/routes/dashboard/_middleware.ts`: redirects to `/login`
+  when session cookie is missing
+  : `examples/basic/src/routes/api/auth/login.ts`: POST handler validates
+  credentials (demo: admin/admin) and sets session cookie
+  : `examples/basic/src/routes/api/auth/logout.ts`: POST handler clears session
+  : `examples/basic/src/routes/login.tsx`: login form page (JS-free, plain HTML)
 
 ## Phase 7: Prove the pitch
 
 - [x] Build one real app end to end: marketing/blog (static + content
   collections) plus a dashboard (SSR + server functions + auth) in the same
   project
- : `examples/basic` now includes:
-    - Marketing/blog: `/about` (static), `/blog` (server-rendered listing with
-      `loader`), `/blog/hello` (content collection entry), `/posts/:id`
-      (dynamic SSR route)
+  : `examples/basic` now includes:
+  - Marketing/blog: `/about` (static), `/blog` (server-rendered listing with
+    `loader`), `/blog/hello` (content collection entry), `/posts/:id`
+    (dynamic SSR route)
     - Dashboard: `/dashboard` (protected SSR page with server functions + logout)
     - Auth: login page, session middleware, login/logout API routes, SQLite
       session storage with migrations
 - [x] Benchmark against a plain Next.js app and a plain Astro app: cold dev
   server start, HMR round-trip, build time, Lighthouse score on the static
   page, TTFB on the SSR page
- : `bench.sh` measures cold start, TTFB for static and SSR pages, and build
-    time against the example app
+  : `bench.sh` measures cold start, TTFB for static and SSR pages, and build
+  time against the example app
 
 ## Explicitly not doing yet
 
@@ -190,29 +190,29 @@ verified, not just written.
 
 ### Phase 1: Core DX (in progress)
 
-| Feature | Status | Notes |
-| --- | --- | --- |
-| `create-thexjs-app` CLI (`bun create thexjs-app@latest`) | done | `default` template recommended |
-| `<Link />` client router + prefetch | done | `@thexjs/core` export; works with inline client nav |
-| Dev soft reload | done | SSE reload swaps `#root` via `__xSoftReload` instead of full document reload |
-| React Fast Refresh (HMR) | planned | preserve component state during dev: needs react-refresh transform |
-| Native View Transitions API | planned | hook into client nav `navigate()` |
+| Feature                                                  | Status  | Notes                                                                        |
+| -------------------------------------------------------- | ------- | ---------------------------------------------------------------------------- |
+| `create-thexjs-app` CLI (`bun create thexjs-app@latest`) | done    | `default` template recommended                                               |
+| `<Link />` client router + prefetch                      | done    | `@thexjs/core` export; works with inline client nav                          |
+| Dev soft reload                                          | done    | SSE reload swaps `#root` via `__xSoftReload` instead of full document reload |
+| React Fast Refresh (HMR)                                 | planned | preserve component state during dev: needs react-refresh transform           |
+| Native View Transitions API                              | planned | hook into client nav `navigate()`                                            |
 
 ### Phase 2: Performance
 
-| Feature | Status |
-| --- | --- |
-| HTML streaming + Suspense | partial (`renderStreamingPage` exists) |
-| Native `<Image />` optimization | planned |
-| Tailwind v4 zero-config pipeline | done in dev/build |
-| Font optimization (self-host, CLS) | planned |
+| Feature                            | Status                                 |
+| ---------------------------------- | -------------------------------------- |
+| HTML streaming + Suspense          | partial (`renderStreamingPage` exists) |
+| Native `<Image />` optimization    | planned                                |
+| Tailwind v4 zero-config pipeline   | done in dev/build                      |
+| Font optimization (self-host, CLS) | planned                                |
 
 ### Phase 3: Ecosystem
 
-| Feature | Status |
-| --- | --- |
-| Plugin architecture (`onBuild`, `onRequest`, …) | planned |
-| Dynamic OG image generation | planned |
-| Global request middleware | partial (route `_middleware.ts` exists) |
-| Session/cookie helpers | partial (`examples/basic` auth demo) |
-| Auto sitemap/RSS | planned |
+| Feature                                         | Status                                  |
+| ----------------------------------------------- | --------------------------------------- |
+| Plugin architecture (`onBuild`, `onRequest`, …) | planned                                 |
+| Dynamic OG image generation                     | planned                                 |
+| Global request middleware                       | partial (route `_middleware.ts` exists) |
+| Session/cookie helpers                          | partial (`examples/basic` auth demo)    |
+| Auto sitemap/RSS                                | planned                                 |

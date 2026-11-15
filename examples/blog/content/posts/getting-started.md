@@ -1,4 +1,5 @@
 ---
+
 title: "Getting Started with x Framework"
 date: "2026-07-26"
 description: "Learn how to build your first fullstack application with x framework."
@@ -31,8 +32,8 @@ my-app/
 
 Each file in `src/pages/` becomes a route automatically:
 
-| File | Route |
-|------|-------|
-| `src/pages/index.tsx` | `/` |
-| `src/pages/about.tsx` | `/about` |
+| File                        | Route         |
+| --------------------------- | ------------- |
+| `src/pages/index.tsx`       | `/`           |
+| `src/pages/about.tsx`       | `/about`      |
 | `src/pages/blog/[slug].tsx` | `/blog/:slug` |

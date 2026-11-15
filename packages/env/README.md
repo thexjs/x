@@ -26,8 +26,8 @@ export const env = createEnv({
 });
 
 env.DATABASE_URL; // string, validated as a URL
-env.PORT;          // number
-env.NODE_ENV;       // "development" | "production" | "test"
+env.PORT; // number
+env.NODE_ENV; // "development" | "production" | "test"
 ```
 
 If any variable is missing or fails validation, `createEnv` throws a single `Error` listing every failure at once:
@@ -40,16 +40,15 @@ Environment validation failed:
 
 ## Validators
 
-| Validator | Accepts | Notes |
-|---|---|---|
-| `str()` | any non-`undefined` string | |
-| `num()` | numeric strings | rejects `NaN` |
-| `bool()` | `"true"` / `"1"` → `true`, `"false"` / `"0"` → `false` | anything else throws |
-| `oneOf([...values])` | one of the given string literals | return type is narrowed to the literal union |
-| `url()` | any string parseable by `new URL(...)` | |
+| Validator            | Accepts                                                | Notes                                        |
+| -------------------- | ------------------------------------------------------ | -------------------------------------------- |
+| `str()`              | any non-`undefined` string                             |                                              |
+| `num()`              | numeric strings                                        | rejects `NaN`                                |
+| `bool()`             | `"true"` / `"1"` → `true`, `"false"` / `"0"` → `false` | anything else throws                         |
+| `oneOf([...values])` | one of the given string literals                       | return type is narrowed to the literal union |
+| `url()`              | any string parseable by `new URL(...)`                 |                                              |
 
 Built-in validators also expose two chaining combinators:
-
 - `.optional()` — a missing variable becomes `undefined` instead of failing;
   a present-but-invalid value still throws. `num().optional()` is typed
   `number | undefined`.

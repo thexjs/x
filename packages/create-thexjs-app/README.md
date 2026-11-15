@@ -25,7 +25,6 @@ bun create thexjs-app@latest
 ```
 
 You'll be guided through interactive prompts:
-
 - **Project name** — e.g. `my-app`
 - **Features** — choose from Tailwind CSS, shadcn/ui, Auth, Content collections, and Hooks
 - **Install & git** — confirm dependency install and `git init`
@@ -43,13 +42,13 @@ Your app runs at `http://localhost:3000` with hot reload.
 The scaffolder ships a single lean base template. Every feature is optional and
 selected at prompt time (or via CLI flags).
 
-| Feature           | Adds                                                                                                  |
-| ----------------- | ----------------------------------------------------------------------------------------------------- |
-| **Tailwind CSS**  | Utility-first styling + the x dev/build Tailwind pipeline                                             |
-| **shadcn/ui**     | Accessible React components in `src/components/ui` (requires Tailwind)                                |
-| **Auth**          | SQLite-backed demo sessions, `/login` and a protected `/dashboard` with middleware                    |
-| **Content**       | Markdown/MDX with frontmatter in `content/`, auto-routed and indexed on `/blog`                       |
-| **Hooks**         | `@thexjs/hooks` dependency — SSR-safe React hooks (debounce, media query, localStorage, forms, server actions) |
+| Feature          | Adds                                                                                                           |
+| ---------------- | -------------------------------------------------------------------------------------------------------------- |
+| **Tailwind CSS** | Utility-first styling + the x dev/build Tailwind pipeline                                                      |
+| **shadcn/ui**    | Accessible React components in `src/components/ui` (requires Tailwind)                                         |
+| **Auth**         | SQLite-backed demo sessions, `/login` and a protected `/dashboard` with middleware                             |
+| **Content**      | Markdown/MDX with frontmatter in `content/`, auto-routed and indexed on `/blog`                                |
+| **Hooks**        | `@thexjs/hooks` dependency — SSR-safe React hooks (debounce, media query, localStorage, forms, server actions) |
 
 Enabling **shadcn/ui** automatically enables **Tailwind CSS**.
 
@@ -64,17 +63,17 @@ Skips the interactive prompts — useful for scripting and CI:
 bun create thexjs-app@latest my-app --tailwind --auth --content --shadcn
 ```
 
-| Flag              | Description                                   |
-| ----------------- | --------------------------------------------- |
-| `<name>`          | Project name (creates a directory named `slug`) |
-| `--tailwind`      | Include Tailwind CSS                          |
-| `--shadcn`        | Include shadcn/ui (implies `--tailwind`)      |
-| `--auth`          | Include demo auth                             |
-| `--content`       | Include content collections                   |
-| `--hooks`         | Include the `@thexjs/hooks` package           |
-| `--no-install`    | Skip `bun install`                            |
-| `--no-git`        | Skip `git init`                               |
-| `--dev`           | Start the dev server after install            |
+| Flag           | Description                                     |
+| -------------- | ----------------------------------------------- |
+| `<name>`       | Project name (creates a directory named `slug`) |
+| `--tailwind`   | Include Tailwind CSS                            |
+| `--shadcn`     | Include shadcn/ui (implies `--tailwind`)        |
+| `--auth`       | Include demo auth                               |
+| `--content`    | Include content collections                     |
+| `--hooks`      | Include the `@thexjs/hooks` package             |
+| `--no-install` | Skip `bun install`                              |
+| `--no-git`     | Skip `git init`                                 |
+| `--dev`        | Start the dev server after install              |
 
 ## Development
 

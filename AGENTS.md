@@ -76,16 +76,16 @@ x start
 
 Routes are scanned from `pagesDir` (default `src/pages`). The `_` prefix is reserved:
 
-| File pattern | Behavior |
-|---|---|
-| `index.tsx` | Route `/` |
-| `about.tsx` | Route `/about` |
-| `[slug].tsx` | Dynamic segment, param in `loader({ params })` |
-| `[...slug].tsx` | Catch-all, param is full remaining path |
-| `_layout.tsx` | Nested layout for that directory |
-| `_middleware.ts` | Middleware for that directory (onion pattern) |
-| `_404.tsx` | Custom 404 page |
-| `api/*.ts` | API route (if in `apiDir` or `pages/api/`) |
+| File pattern     | Behavior                                       |
+| ---------------- | ---------------------------------------------- |
+| `index.tsx`      | Route `/`                                      |
+| `about.tsx`      | Route `/about`                                 |
+| `[slug].tsx`     | Dynamic segment, param in `loader({ params })` |
+| `[...slug].tsx`  | Catch-all, param is full remaining path        |
+| `_layout.tsx`    | Nested layout for that directory               |
+| `_middleware.ts` | Middleware for that directory (onion pattern)  |
+| `_404.tsx`       | Custom 404 page                                |
+| `api/*.ts`       | API route (if in `apiDir` or `pages/api/`)     |
 
 **API routes** export `GET`, `POST`, `PUT`, `PATCH`, `DELETE` handlers. Each receives the `Request` and returns a `Response`.
 
@@ -110,12 +110,12 @@ Files in `actionsDir` (default `src/actions`) export async functions. They are c
 
 ```ts
 export default defineConfig({
-  pagesDir: "src/pages",     // default
+  pagesDir: "src/pages", // default
   layoutsDir: "src/layouts", // default
-  apiDir: "src/api",         // default
+  apiDir: "src/api", // default
   actionsDir: "src/actions", // default
-  contentDir: "content",     // undefined
-  port: 3000,                // default
+  contentDir: "content", // undefined
+  port: 3000, // default
 });
 ```
 

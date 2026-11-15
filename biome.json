@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.5.8/schema.json",
+  "$schema": "https://biomejs.dev/schemas/2.6.2/schema.json",
   "assist": { "actions": { "source": { "organizeImports": "on" } } },
   "files": {
     "includes": [
@@ -11,7 +11,8 @@
       "!**/.x",
       "!**/.vercel",
       "!**/scripts/bench/results",
-      "!**/packages/core/src/__fixtures__/bench"
+      "!**/packages/core/src/__fixtures__/bench",
+      "!**/.changeset/*.md"
     ]
   },
   "formatter": {

@@ -48,7 +48,6 @@
 ### Minor Changes
 
 - d628d5e: Auth hardening (closes #75 and #112):
-  
   - `defineAuth` now throws in production when no `secret` is configured,
     instead of silently generating a per-process random secret that invalidates
     every session on restart. Dev fallback uses `crypto.randomBytes`.
@@ -86,14 +85,14 @@
 ### Patch Changes
 
 - 8875aea: fix(publish): stop the `workspace:*` protocol from leaking into published tarballs
-  
+
   `@thexjs/adapter-vercel@1.0.6` and `@thexjs/auth@3.0.5` were published with
   `"@thexjs/core": "workspace:*"` in their manifests. Bun publishes the
   `workspace:` range literally (it does not rewrite it like pnpm does), so
   consumers installing either package hit:
-  
+
       Workspace dependency "@thexjs/core" not found
-  
+
   Now the internal dependency is a real semver range (`^1.3.0`, matching how
   `@thexjs/cli` already declares it), so both packages install cleanly from
   npm. A repo-wide guard test (`scripts/workspace-protocol.test.ts`) plus a
@@ -171,7 +170,6 @@
 ### Minor Changes
 
 - 990a083: New `@thexjs/auth` package: plug-and-play authentication for x apps.
-
   - `defineAuth()` with credentials (username/password) and OAuth2 providers,
     including a preconfigured GitHub preset.
   - Passwords hashed with Argon2 via `Bun.password` (`hashPassword` /

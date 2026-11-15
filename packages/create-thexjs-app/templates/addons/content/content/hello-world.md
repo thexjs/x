@@ -1,4 +1,5 @@
 ---
+
 title: Hello from content collections
 description: Markdown with frontmatter becomes a route automatically.
 ---

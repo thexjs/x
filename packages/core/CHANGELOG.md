@@ -11,7 +11,6 @@
 ### Patch Changes
 
 - bfe83ae: Fix CI and Vercel builds:
-  
   - Treat Vercel's non-secret `VERCEL_HASH_SALT` timestamp as safe in the
     client-bundle value scan. Its short numeric value collides with numbers in
     bundled JS, which previously failed every Vercel deployment with a false
@@ -30,7 +29,7 @@
   etc.) or random-looking values, so it doesn't fail real builds over ordinary
   values like `VERCEL_ENV=production` coincidentally matching other bundle
   text.
-  
+
   Non-secret variables that still collide with bundle text can be skipped with
   `THEXJS_ENV_SCAN_IGNORE=KEY1,KEY2`. This only affects the value scan;
   `process.env.X` references in client code are still rejected.
@@ -82,7 +81,7 @@
 
 - f537c1c: The Vercel adapter (`x build --adapter vercel`) now computes correct
   server-action names for batched action modules (`export const actions = { greet, farewell }`).
-  
+
   Previously `fnNames` was derived from `Object.keys(actionMod)` alone, which yields
   `["actions"]` for the batched pattern — so the generated client stub exported a function
   literally named `actions` and a browser island doing `import { greet }` silently got
@@ -97,28 +96,26 @@
 - 3637faf: Migration runners (`runSQLiteMigrations` / `runPostgresMigrations`) now
   record a sha256 checksum of each migration file in `_x_migrations.checksum`
   alongside the name, and detect drift when an already-applied file is edited:
-  
   - `_x_migrations.checksum` is stored on apply and backfilled for existing
     deployments (`ADD COLUMN` via pragma probe on SQLite, `IF NOT EXISTS` on
     Postgres).
-  
+
   - On re-run, applied files whose content no longer matches the stored
     checksum are reported in the new `result.drifted` array and logged with a
     warning by default. Pass `{ onDrift: "fail" }` to abort instead of
     continuing with a mismatched schema.
-  
+
   - Migrations recorded before checksums existed show up in the new
     `result.unknownContent` array and are only warned on — never failed — so
     existing deployments keep booting quietly while being made aware of the
     unverifiable history.
-  
+
   - Both result types gain `drifted` / `unknownContent` and now always include
     them (previously `drifted`/`unknownContent` did not exist).
 - d3ecd41: Frontmatter is now parsed as real YAML via Bun's native parser instead of a
   hand-rolled line subset that silently dropped anything non-trivial.
-  
+
   What changed:
-  
   - Nested mappings (`seo:\n  title: ...`), block scalars (`|`, `>`), and
     `- item` sequence syntax parse correctly instead of losing data.
   - Scalar types are coerced per YAML 1.2 (`draft: true` → boolean,
@@ -129,7 +126,7 @@
     discarded.
   - The closing `---` delimiter is now recognized only at the start of its own
     line, so a value like `title: a---b` no longer truncates the frontmatter.
-  
+
   Behavioral notes: a value containing `: ` (colon + space) must now be quoted
   per YAML rules, and `key:` with no value yields `null` rather than `""`.
 
@@ -142,7 +139,6 @@
 ### Minor Changes
 
 - 65806b5: OpenTelemetry tracing correlation (half of #79):
-  
   - `@thexjs/core` never initializes OpenTelemetry itself — apps opt in by
     calling `setTracer(tracer)` (or `getTracer`) with any tracer whose
     `startSpan(name, { attributes })` matches the OTel surface. Without a
@@ -174,7 +170,6 @@
 ### Minor Changes
 
 - 32179eb: OpenTelemetry tracing correlation (half of #79):
-  
   - `@thexjs/core` never initializes OpenTelemetry itself — apps opt in by
     calling `setTracer(tracer)` (or `getTracer`) with any tracer whose
     `startSpan(name, { attributes })` matches the OTel surface. Without a
@@ -206,7 +201,6 @@
 ### Minor Changes
 
 - d628d5e: Auth hardening (closes #75 and #112):
-  
   - `defineAuth` now throws in production when no `secret` is configured,
     instead of silently generating a per-process random secret that invalidates
     every session on restart. Dev fallback uses `crypto.randomBytes`.
@@ -229,7 +223,6 @@
     token bytes) instead of `!==`, closing a timing side-channel (#112).
 - 88902c4: feat: add audit logging for auth lifecycle and permission denials. `@thexjs/core` gains a pluggable `AuditSink` (`setAuditSink`, `createConsoleAuditSink`), the `audit` event emitter, and typed helpers (`auditLoginSuccess`, `auditLoginFailure`, `auditLogout`, `auditPasswordChanged`, `auditRoleChanged`, `auditPermissionDenied`, `auditSessionRevoked`). Reasons and metadata are scrubbed (sensitive keys and embedded credentials) before reaching the sink. `@thexjs/auth` now writes audit entries for sign-in success/failure, brute-force rate limiting, logout, session revocation, and RBAC permission denials; OAuth callback failures are reported instead of crashing, and also audited.
 - 167bded: Harden the image proxy further (closes #114):
-  
   - **Upstream byte cap** — new `maxBytes` option (default 10 MiB). A declared
     `Content-Length` over the cap is refused before streaming; a chunked body is
     wrapped in a counting stream that aborts (`UpstreamImageTooLargeError`) the
@@ -247,10 +240,9 @@
     fails open — the fetch remains allow-list-bound). Override with the new
     `resolveHost` option. The check re-runs on every manual redirect hop, so a
     hop rebinding to a private target is refused before the fetch.
-  
+
   Full v4/v6 + DNS/IP regression coverage in `proxy.test.ts`.
 - 4361c32: Request body size limit (#109):
-  
   - `createApp` gains a `maxBodySize` option (default 1 MiB), enforced ahead of
     route/action dispatch across every body-reading surface: `/api/*` routes,
     `/__x/actions/*` server functions, `/__x/revalidate`, and hydration-mismatch
@@ -264,7 +256,6 @@
   - `enforceRequestBodySize` and `RequestBodyTooLargeError` are exported from
     `@thexjs/core`.
 - 193cc6a: Log redaction (half of #79):
-  
   - `@thexjs/core` now ships a redaction pass (`redact.ts`) applied inside the
     structured logger's `write()`: fields under sensitive key names (`password`,
     `token`, `secret`, `authorization`, `cookie`, `session`, `apiKey`, ...,
@@ -277,7 +268,6 @@
   - This is belt-and-suspenders beside the build-time env-leak scanner: that one
     protects client bundles, this one protects server logs, in dev and prod.
 - 3234581: Contain process-level crashes and route them to the error reporter (closes #85):
-  
   - New `installProcessCrashHandlers()` helper (exported from `@thexjs/core`)
     registers `uncaughtException`/`unhandledRejection` handlers that log the
     crash and report it through the configured error reporter, so a throw
@@ -297,7 +287,6 @@
     shared state/DB; serverless deploys already provide that boundary. Left for
     the threat-model doc (#80).
 - f1c55a0: Don't echo server-function error text to clients in production (closes #110):
-  
   - In production, an action that throws now returns `Internal error (id: <opaque>)`
     with the same id in the `x-x-error-id` header, instead of the raw
     `err.message`. Driver errors that embed schema details, connection strings,
@@ -309,9 +298,8 @@
   - Regression test: a Postgres-style `duplicate key ... "users_email_key"`
     message is proven absent from the production response body, and the opaque
     id is validated in both body and header. Pairs with #79 log redaction: the
-    server stops echoing secrets to loggers *and* to clients.
+    server stops echoing secrets to loggers _and_ to clients.
 - 8f9a8bf: Escape regex metacharacters in static route segments (closes #113):
-  
   - `routePatternToRegex` now escapes `.`, `+`, `(`, `)`, `?`, `[`, `]`, `^`,
     `$`, `{`, `}`, `|`, `\` in literal segments before expanding `:param`/`*`
     tokens, so a folder named `v1.2` matches only `/v1.2` (previously the `.`
@@ -322,7 +310,6 @@
     for `.`/`+` on the server-action side; dynamic `:param`/`*` tokens still
     capture as before.
 - 7dee9e6: Emit a per-response CSP nonce instead of `script-src 'unsafe-inline'` (closes #111):
-  
   - HTML responses (server-rendered, ISR, 404, content pages) now generate a
     128-bit random nonce per request, stamp it on every framework inline script
     (client navigation, live-reload, island hydration props), and build the
@@ -345,7 +332,6 @@
 ### Patch Changes
 
 - a97bfbf: Deterministic SSR and observable hydration:
-  
   - Pages now render exactly once. The two-pass "discovery" render (one throwaway
     pass to find islands, then the real pass for the HTML) is gone: `renderPageOnce`
     renders the tree a single time and resolves the island script list from the
@@ -366,7 +352,6 @@
 ### Patch Changes
 
 - c9f5810: Streaming SSR responses now respect backpressure and honor client disconnect:
-  
   - The SSR stream pump is pull-driven: it only reads from React's stream while
     the HTTP sink has room, so a slow consumer throttles the render instead of
     buffering unbounded chunks in memory.
@@ -383,13 +368,11 @@
 
 - 97d0f39: Add a global error boundary on the Bun serve path: createApp now exposes an `error` hook and guards the top of the fetch handler, so a thrown loader/API/handler error returns a clean 500 instead of taking down the process. Revalidation JSON body parsing is guarded (400 on malformed JSON), the streaming SSR pump tolerates a closed/aborted controller, and the generated production entry routes `uncaughtException`/`unhandledRejection` through the error reporter. Also closes a double-percent-encoding gap in the markdown link sanitizer: `isSafeLinkUrl` now decodes repeatedly (bounded) so double- and triple-encoded `javascript:` URLs are rejected like every other bypass.
 - 1a6524f: Make request/rebuild state truly request-scoped and prove it under load:
-  
   - Island ids are generated from each request's own registry (`createIslandRegistry` now carries the id counter), so ids restart per request instead of growing forever on a shared module-level counter.
   - `getServerFunctionHandler` iterates an immutable snapshot of the action registry, so a concurrent dev rebuild can no longer hand an in-flight request a half-populated `ACTION_ROUTES` array.
   - New `concurrency.test.ts`: N parallel requests with distinct identities assert zero cross-request leakage of loader data, headers, and island ids.
   - Documented the per-request state contract in the data-layer docs (no shared mutable module state; `AsyncLocalStorage` for cross-write request context).
 - 254f29b: Make the ISR cache key-safe, bounded, and stampede-proof:
-  
   - Cache keys are now the full URL (pathname + query string), so `/search?q=alpha` and `/search?q=beta` on the same ISR route never serve each other's HTML.
   - Cache is an `IsrCache` with a 500-entry LRU cap instead of an unbounded `Map`, evicting least-recently-used entries first.
   - Concurrent misses for the same URL share one in-flight render (`getOrCompute`), so a stampede rebuilds the entry exactly once.
@@ -400,7 +383,7 @@
 ### Patch Changes
 
 - e4ad9ee: fix(adapter): emit server-mode islands to disk and wire them into the render function
-  
+
   Server-mode pages (e.g. a home page using the GitHub loader) never shipped
   their client islands in production: `bundleRouteIslands()` built bundles in
   memory only, `adapter/scan.ts` precomputed resolved routes/actions before
@@ -408,7 +391,7 @@
   resulting production HTML referenced `/_islands/...` script files that were
   absent from Vercel's output, so `client="load"` islands (scroll-spy, analytics,
   hero scroll cue) never hydrated.
-  
+
   Now `bundleRouteIslandsToDisk()` writes the shared island bundle (and its
   module dependency graph) under the adapter's `islandsDir`, the adapter resolves
   them into the route's `islandScripts`, `generate-entry` emits them into the
@@ -420,7 +403,7 @@
 ### Patch Changes
 
 - e4ad9ee: fix(adapter): emit server-mode islands to disk and wire them into the render function
-  
+
   Server-mode pages (e.g. a home page using the GitHub loader) never shipped
   their client islands in production: `bundleRouteIslands()` built bundles in
   memory only, `adapter/scan.ts` precomputed resolved routes/actions before
@@ -428,7 +411,7 @@
   resulting production HTML referenced `/_islands/...` script files that were
   absent from Vercel's output, so `client="load"` islands (scroll-spy, analytics,
   hero scroll cue) never hydrated.
-  
+
   Now `bundleRouteIslandsToDisk()` writes the shared island bundle (and its
   module dependency graph) under the adapter's `islandsDir`, the adapter resolves
   them into the route's `islandScripts`, `generate-entry` emits them into the
@@ -440,7 +423,6 @@
 ### Minor Changes
 
 - de14e71: feat(image): ship a next/image-equivalent `<Image>` component and accept width/quality hints in the image proxy
-  
   - New `Image` component (`packages/core/src/image.tsx`, exported from `@thexjs/core`):
     responsive `srcset`/`sizes` through the allow-listed `/_x/image` proxy,
     `priority` (skips lazy, sets fetchpriority=high), `fill` mode,
@@ -464,13 +446,12 @@
 ### Patch Changes
 
 - c8e7985: Fix several correctness and security bugs found in the bug hunt:
-  
   - **Image proxy**: blocked serving `image/svg+xml` (SVGs served from the app's
     own origin could execute scripts with origin privileges) and hardened
     redirects — automatic redirect-following was removed, each hop is now
     re-checked against the host allow-list, and the hop count is capped. Blocks
     an allow-listed origin redirecting to internal/metadata endpoints (SSRF).
-  - **ISR**: the render cache was keyed by the route *pattern* (e.g.
+  - **ISR**: the render cache was keyed by the route _pattern_ (e.g.
     `/blog/[slug]`), so every dynamic URL on that pattern shared one cached page
     and leaked content across URLs. Cache entries are now keyed by the concrete
     URL, and the cache is checked before the loader runs so hits skip data
@@ -540,7 +521,6 @@
 
 - d59c5b0: Refactored `createRedisRateLimitStore` so the Redis client connection is
   injectable, and exposed the building blocks for custom transports and tests:
-
   - `createRedisRateLimitStoreFromClient(clientFactory)` builds the shared
     rate-limit store from an explicit `RedisClientFactory`.
   - `RedisClientLike` / `RedisClientFactory` types are now exported.

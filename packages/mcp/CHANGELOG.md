@@ -5,7 +5,6 @@
 ### Patch Changes
 
 - bfe83ae: Fix CI and Vercel builds:
-  
   - Treat Vercel's non-secret `VERCEL_HASH_SALT` timestamp as safe in the
     client-bundle value scan. Its short numeric value collides with numbers in
     bundled JS, which previously failed every Vercel deployment with a false
