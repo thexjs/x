@@ -19,7 +19,7 @@ import { buildPackageJson, resolveVersions } from "./package-json.js";
 import {
   BASE_TEMPLATE,
   copyAddon,
-  ensureDir,
+  createTargetDir,
   FEATURES,
   type FeatureId,
   featureLabel,
@@ -233,7 +233,12 @@ async function main(): Promise<void> {
   const spin = spinner();
   spin.start(`Scaffolding "${slug}"`);
 
-  ensureDir(targetDir);
+  try {
+    createTargetDir(targetDir);
+  } catch (err) {
+    spin.stop("Scaffolding failed");
+    return abort((err as Error).message);
+  }
   mergeTree(BASE_TEMPLATE, targetDir);
   finalizeGitignore(targetDir);
   finalizeAgentConfigs(targetDir);

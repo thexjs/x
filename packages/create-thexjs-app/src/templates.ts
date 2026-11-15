@@ -1,5 +1,5 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface FeatureAddon {
@@ -131,6 +131,20 @@ export function normalizeFeatures(selected: FeatureId[]): NormalizedFeatures {
 
 export function ensureDir(path: string): void {
   if (!existsSync(path)) mkdirSync(path, { recursive: true });
+}
+
+// Single check-then-create point for the project root. `mkdir` without
+// `recursive` is atomic: if a concurrent run created the directory first, it
+// fails with EEXIST and we re-check whether it is non-empty.
+export function createTargetDir(path: string): void {
+  try {
+    mkdirSync(path, { recursive: false });
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
+    if (readdirSync(path).length > 0) {
+      throw new Error(`Directory "${basename(path)}" already exists and is not empty.`);
+    }
+  }
 }
 
 export function mergeTree(src: string, dest: string): void {
