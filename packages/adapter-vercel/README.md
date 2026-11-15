@@ -27,7 +27,7 @@ actions), no function is emitted at all -- `config.json` only does filesystem ro
 
 1. Runs `@thexjs/core`'s normal `build()` to prerender every static-mode page/content
    entry and compile island bundles -- this becomes `static/`.
-2. Separately resolves every *server-mode* page, API route, layout, middleware file,
+2. Separately resolves every _server-mode_ page, API route, layout, middleware file,
    and server-action file **at build time** (reusing `@thexjs/core`'s own scanners), so
    nothing at request time depends on walking the filesystem or on a dynamic
    `import(path)` of a `.tsx` file -- both of those only work under Bun.
@@ -51,7 +51,7 @@ await buildVercelOutput({
   actionsDir: "src/actions",
   contentDir: "content",
   outputDir: ".vercel/output", // default
-  runtime: "nodejs22.x",       // default; "nodejs20.x" is discontinued on Vercel
+  runtime: "nodejs22.x", // default; "nodejs20.x" is discontinued on Vercel
 });
 ```
 

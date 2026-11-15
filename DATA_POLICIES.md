@@ -25,11 +25,11 @@ and the policy below is your starting point.
 
 ## Where templates and packages can touch PII (honest caveats)
 
-| Component | What it can hold | Framework's position |
-|---|---|---|
-| `@thexjs/auth` | Usernames, password hashes (Argon2id), HMAC digests of session tokens, OAuth identities | The **digest** of a session token is not usable outside your app, but a **username + password hash is personal data** if your users are natural persons. You own the retention for these tables. |
-| `examples/saas` template | A `sessions` table (`INSERT INTO sessions (… username …)`) | Demo data only; the demo auth is hardcoded `admin`/`admin` and DEMO ONLY (see `SECURITY.md`). Delete it before shipping. |
-| `examples/basic` template | `placeholder-data.ts` seeds demo records with **names and email addresses** | Synthetic placeholders; do not seed real-person data into a production DB. |
+| Component                 | What it can hold                                                                        | Framework's position                                                                                                                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `@thexjs/auth`            | Usernames, password hashes (Argon2id), HMAC digests of session tokens, OAuth identities | The **digest** of a session token is not usable outside your app, but a **username + password hash is personal data** if your users are natural persons. You own the retention for these tables. |
+| `examples/saas` template  | A `sessions` table (`INSERT INTO sessions (… username …)`)                              | Demo data only; the demo auth is hardcoded `admin`/`admin` and DEMO ONLY (see `SECURITY.md`). Delete it before shipping.                                                                         |
+| `examples/basic` template | `placeholder-data.ts` seeds demo records with **names and email addresses**             | Synthetic placeholders; do not seed real-person data into a production DB.                                                                                                                       |
 
 None of the templates ship a "delete my data" flow, because none of them are
 production applications. When you build the real thing, the policy below is
@@ -38,7 +38,6 @@ the floor to implement.
 ## Inherited policy for apps built on x
 
 If your app stores personal data, implement at minimum:
-
 1. **Retention limits** — a documented maximum retention window per data class
    (e.g. sessions: 30 days inactive; account data: as long as the account
    exists; audit data: per regulatory requirement). Enforce with a scheduled
@@ -59,7 +58,7 @@ If your app stores personal data, implement at minimum:
   per-request registries and caches are in-memory and dropped with the
   process or the request.
 - The in-memory ISR page cache and rate-limiter stores are process-local and
-  vanish on restart; nothing is written to disk unless *you* add a store
+  vanish on restart; nothing is written to disk unless _you_ add a store
   (Redis, DB).
 
 ## Review cadence

@@ -255,6 +255,7 @@ describe("pumpStreamingResponse", () => {
     });
 
     test("a synchronous render error rejects the promise (surfaces via the page boundary)", async () => {
+      // biome-ignore lint/correctness/noComponentHookFactories: intentional per-test throw-on-render fixture.
       function Throws(): never {
         throw new Error("react exploded during shell");
       }
