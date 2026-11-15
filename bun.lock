@@ -45,7 +45,7 @@
         "clsx": "^2.1.1",
         "lucide-react": "^1.61.0",
         "react": "^19.3.1",
-        "react-dom": "^19.1.0",
+        "react-dom": "^19.3.1",
         "shadcn": "^4.19.0",
         "tailwind-merge": "^3.7.0",
         "tw-animate-css": "^1.2.0",
@@ -110,7 +110,7 @@
         "clsx": "^2.1.1",
         "lucide-react": "^1.61.0",
         "react": "^19.3.1",
-        "react-dom": "^19.1.0",
+        "react-dom": "^19.3.1",
         "shadcn": "^4.19.0",
         "tailwind-merge": "^3.7.0",
         "tw-animate-css": "^1.2.0",
@@ -122,6 +122,18 @@
         "@types/react-dom": "^19.2.5",
         "tailwindcss": "^4.3.3",
         "typescript": "^5.8.0",
+      },
+    },
+    "packages/adapter-node": {
+      "name": "@thexjs/adapter-node",
+      "version": "0.0.0",
+      "dependencies": {
+        "@thexjs/core": "^1.9.0",
+        "react": "^19.0.0",
+      },
+      "devDependencies": {
+        "@types/bun": "latest",
+        "tsup": "^8.3.0",
       },
     },
     "packages/adapter-vercel": {
@@ -157,14 +169,17 @@
         "@thexjs/core": "^1.9.0",
       },
       "devDependencies": {
+        "@thexjs/adapter-node": "0.0.0",
         "@thexjs/adapter-vercel": "^1.0.5",
         "react": "^19.3.1",
         "tsup": "^8.3.0",
       },
       "peerDependencies": {
+        "@thexjs/adapter-node": "0.0.0",
         "@thexjs/adapter-vercel": "^1.0.5",
       },
       "optionalPeers": [
+        "@thexjs/adapter-node",
         "@thexjs/adapter-vercel",
       ],
     },
@@ -579,6 +594,8 @@
     "@tailwindcss/oxide-win32-arm64-msvc": ["@tailwindcss/oxide-win32-arm64-msvc@4.3.3", "", { "os": "win32", "cpu": "arm64" }, "sha512-3rc292Ca2ceK6Ulcc/bAVnTs/3nDtoPhyEKlgPv+yQJQi/JS/AMJlqzxvlDacL1nekbrcf6bTqp/jV4qgnPxNQ=="],
 
     "@tailwindcss/oxide-win32-x64-msvc": ["@tailwindcss/oxide-win32-x64-msvc@4.3.3", "", { "os": "win32", "cpu": "x64" }, "sha512-yJ0pwIVc/nYeGoV02WtsN8KYyLQv7kyI2wDnkezyJlGGjkd4QLwDGAwl47YpPJeuI0M0ObaXGSPjvWDPeTPggw=="],
+
+    "@thexjs/adapter-node": ["@thexjs/adapter-node@workspace:packages/adapter-node"],
 
     "@thexjs/adapter-vercel": ["@thexjs/adapter-vercel@workspace:packages/adapter-vercel"],
 

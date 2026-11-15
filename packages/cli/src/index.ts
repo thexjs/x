@@ -231,6 +231,27 @@ async function cmdBuild(adapterName: string | undefined): Promise<void> {
     return;
   }
 
+  if (adapterName === "node") {
+    let buildNodeOutput: (options: Record<string, unknown>) => Promise<void>;
+    try {
+      ({ buildNodeOutput } = await import("@thexjs/adapter-node"));
+    } catch {
+      xError('"--adapter node" requires @thexjs/adapter-node.');
+      xError("install it with: bun add -d @thexjs/adapter-node");
+      process.exit(1);
+    }
+    await buildNodeOutput({
+      ...rest,
+      ...(opts.security ? { security: opts.security } : {}),
+      ...(opts.observability ? { observability: opts.observability } : {}),
+      ...(opts.images ? { images: opts.images } : {}),
+      projectRoot: projectDir,
+    });
+    const ms = Math.round(performance.now() - start);
+    xSuccess(`build complete in ${ms}ms -> dist-node`);
+    return;
+  }
+
   if (adapterName) {
     xError(`unknown adapter "${adapterName}"`);
     process.exit(1);

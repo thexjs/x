@@ -35,14 +35,19 @@
     "@thexjs/core": "^1.9.0"
   },
   "peerDependencies": {
+    "@thexjs/adapter-node": "0.0.0",
     "@thexjs/adapter-vercel": "^1.0.5"
   },
   "peerDependenciesMeta": {
+    "@thexjs/adapter-node": {
+      "optional": true
+    },
     "@thexjs/adapter-vercel": {
       "optional": true
     }
   },
   "devDependencies": {
+    "@thexjs/adapter-node": "0.0.0",
     "@thexjs/adapter-vercel": "^1.0.5",
     "react": "^19.3.1",
     "tsup": "^8.3.0"
