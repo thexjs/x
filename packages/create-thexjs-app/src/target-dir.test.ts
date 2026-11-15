@@ -34,7 +34,9 @@ describe("createTargetDir", () => {
     mkdirSync(targetDir);
     writeFileSync(join(targetDir, "package.json"), "{}");
 
-    expect(() => createTargetDir(targetDir)).toThrow(/already exists and is not empty/);
+    expect(() => createTargetDir(targetDir)).toThrow(
+      'Directory "raced-app" already exists and is not empty.',
+    );
     expect(readFileSync(join(targetDir, "package.json"), "utf8")).toBe("{}");
   });
 });

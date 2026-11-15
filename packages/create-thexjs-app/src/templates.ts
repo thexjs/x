@@ -1,5 +1,5 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, statSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export interface FeatureAddon {
@@ -142,7 +142,7 @@ export function createTargetDir(path: string): void {
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
     if (readdirSync(path).length > 0) {
-      throw new Error(`Directory "${path}" already exists and is not empty.`);
+      throw new Error(`Directory "${basename(path)}" already exists and is not empty.`);
     }
   }
 }
