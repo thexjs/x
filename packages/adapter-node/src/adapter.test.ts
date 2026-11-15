@@ -126,6 +126,15 @@ describe("generateEntrySource", () => {
     expect(src).toContain("if (res.headersSent)");
     expect(src).toContain("res.destroy");
   });
+
+  test("applies the app's security headers to static responses too, not just __x_app.fetch()", () => {
+    const src = generateEntrySource(unitManifest(), "/tmp/e", entryOpts);
+    expect(src).toContain("buildSecurityHeaders");
+    expect(src).toContain("__x_security.headers === false ? null : buildSecurityHeaders");
+    expect(src).toContain(
+      "for (const [key, value] of __x_staticHeaders) res.setHeader(key, value);",
+    );
+  });
 });
 
 describe("generated bridge functions (eval'd from the real generated source, exercised for real)", () => {
@@ -306,10 +315,17 @@ export default function About() {
     const staticRes = await fetch(`http://127.0.0.1:${port}/`);
     expect(staticRes.status).toBe(200);
     expect(await staticRes.text()).toContain("<h1>Home</h1>");
+    // Static responses are served directly by the bridge, before
+    // __x_app.fetch() ever runs -- they must still carry the same security
+    // headers a server-rendered response gets, not ship with none.
+    expect(staticRes.headers.get("x-frame-options")).toBe("DENY");
+    expect(staticRes.headers.get("content-security-policy")).toContain("default-src 'self'");
+    expect(staticRes.headers.get("strict-transport-security")).toContain("max-age=");
 
     const serverRes = await fetch(`http://127.0.0.1:${port}/about`);
     expect(serverRes.status).toBe(200);
     expect(await serverRes.text()).toContain("<h1>About</h1>");
+    expect(serverRes.headers.get("x-frame-options")).toBe("DENY");
 
     const apiRes = await fetch(`http://127.0.0.1:${port}/api/hello`);
     expect(apiRes.status).toBe(200);

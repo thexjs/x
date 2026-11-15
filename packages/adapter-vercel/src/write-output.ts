@@ -1,11 +1,43 @@
 import { cpSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { buildSecurityHeaders } from "@thexjs/core";
 import type { BuildManifest, VercelAdapterOptions } from "./types";
 
 export interface VercelConfigRoute {
   handle?: "filesystem";
   src?: string;
   dest?: string;
+}
+
+/**
+ * The `render.func` function response already gets the app's security
+ * headers from `withResponseHardening` inside the real `createApp()` it
+ * runs. Static assets never reach that function -- Vercel's filesystem
+ * routing (the `{ handle: "filesystem" }` route above) serves them straight
+ * from the CDN -- so without this, every prerendered HTML page and asset
+ * would ship with none of the app's CSP/HSTS/X-Frame-Options/etc. Emitting
+ * them as a native Build Output API `headers` rule applies them at the edge
+ * for the static tier, the same way the render function applies them at
+ * request time. No per-request CSP nonce exists for a precomputed static
+ * file, matching how any other no-nonce response already behaves elsewhere
+ * in the framework.
+ */
+function staticHeadersConfig(
+  security: BuildManifest["security"],
+): { source: string; headers: { key: string; value: string }[] }[] {
+  const headersOption = (security as { headers?: unknown } | undefined)?.headers;
+  if (headersOption === false) return [];
+  const built = buildSecurityHeaders(
+    (headersOption ?? {}) as Parameters<typeof buildSecurityHeaders>[0],
+  );
+  const headers: { key: string; value: string }[] = [];
+  // Headers.entries() exists at runtime in Bun/Node but isn't in the DOM lib
+  // types tsup builds against -- cast the same way security/headers.ts does.
+  for (const [key, value] of built as unknown as IterableIterator<[string, string]>) {
+    headers.push({ key, value });
+  }
+  if (headers.length === 0) return [];
+  return [{ source: "/(.*)", headers }];
 }
 
 /** `.vercel/output/config.json` -- static assets first, then (only if the
@@ -23,6 +55,8 @@ export function writeConfigJson(outputDir: string, manifest: BuildManifest): voi
     routes.push({ src: "/(.*)", dest: "/render" });
   }
   const config: Record<string, unknown> = { version: 3, routes };
+  const headers = staticHeadersConfig(manifest.security);
+  if (headers.length > 0) config.headers = headers;
   const remoteHosts = manifest.images?.remoteHosts;
   if (remoteHosts && remoteHosts.length > 0) {
     config.images = {
