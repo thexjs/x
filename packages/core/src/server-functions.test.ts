@@ -68,9 +68,7 @@ describe("server function dispatch", () => {
       }
 
       const handler = getServerFunctionHandler();
-      const res = await handler(
-        post("/__x/actions/posts/new/resolve", { body: "[]" }),
-      );
+      const res = await handler(post("/__x/actions/posts/new/resolve", { body: "[]" }));
       expect(res?.status).toBe(200);
       expect(await res?.json()).toBe("literal");
     }
