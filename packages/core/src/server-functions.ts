@@ -84,7 +84,40 @@ function snapshotActionRoutes(): ActionEntry[] {
     routePath: entry.routePath,
     paramNames: entry.paramNames,
     fns: new Map(entry.fns),
-  }));
+  })).sort(compareActionRoutes);
+}
+
+// Action routes use the same precedence as page routes: literal segments
+// first, then params, then catch-alls. Sorting the per-request snapshot keeps
+// dispatch deterministic without changing the order used while routes are
+// registered during a dev rebuild.
+function compareActionRoutes(a: ActionEntry, b: ActionEntry): number {
+  const aCategory = routeCategory(a);
+  const bCategory = routeCategory(b);
+  if (aCategory !== bCategory) return aCategory - bCategory;
+
+  const aSpecificity = segmentSpecificity(a);
+  const bSpecificity = segmentSpecificity(b);
+  for (let i = 0; i < Math.max(aSpecificity.length, bSpecificity.length); i++) {
+    const as = aSpecificity[i] ?? -1;
+    const bs = bSpecificity[i] ?? -1;
+    if (as !== bs) return as - bs;
+  }
+
+  return a.routePath < b.routePath ? -1 : a.routePath > b.routePath ? 1 : 0;
+}
+
+function routeCategory(entry: ActionEntry): number {
+  if (entry.paramNames.length === 0) return 0;
+  if (entry.routePath.includes("*")) return 2;
+  return 1;
+}
+
+function segmentSpecificity(entry: ActionEntry): number[] {
+  return entry.routePath
+    .split("/")
+    .filter((segment) => segment.length > 0)
+    .map((segment) => (segment === "*" ? 2 : segment.startsWith(":") ? 1 : 0));
 }
 
 export function getServerFunctionHandler(

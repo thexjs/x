@@ -53,6 +53,37 @@ describe("registerServerFunctions", () => {
 });
 
 describe("server function dispatch", () => {
+  test("prefers literal action routes over params in either registration order", async () => {
+    for (const routes of [
+      ["literal", "param"],
+      ["param", "literal"],
+    ]) {
+      resetServerFunctions();
+      for (const route of routes) {
+        if (route === "literal") {
+          registerServerFunctions("/posts/new", [], { resolve: async () => "literal" });
+        } else {
+          registerServerFunctions("/posts/:id", ["id"], { resolve: async () => "param" });
+        }
+      }
+
+      const handler = getServerFunctionHandler();
+      const res = await handler(post("/__x/actions/posts/new/resolve", { body: "[]" }));
+      expect(res?.status).toBe(200);
+      expect(await res?.json()).toBe("literal");
+    }
+  });
+
+  test("prefers params over catch-all action routes", async () => {
+    registerServerFunctions("/posts/*", ["path"], { resolve: async () => "catch-all" });
+    registerServerFunctions("/posts/:id", ["id"], { resolve: async () => "param" });
+
+    const handler = getServerFunctionHandler();
+    const res = await handler(post("/__x/actions/posts/new/resolve", { body: "[]" }));
+    expect(res?.status).toBe(200);
+    expect(await res?.json()).toBe("param");
+  });
+
   test("runs a registered action and returns its JSON result", async () => {
     registerServerFunctions("/greet", [], { greet: okFn });
     const handler = getServerFunctionHandler();
