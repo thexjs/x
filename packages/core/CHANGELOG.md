@@ -1,5 +1,11 @@
 # @thexjs/core
 
+## 1.10.2
+
+### Patch Changes
+
+- e65b6af: Dispatch server actions by route specificity so literal routes take precedence over params and catch-alls.
+
 ## 1.10.1
 
 ### Patch Changes
