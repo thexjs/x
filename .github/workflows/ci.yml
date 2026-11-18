@@ -106,14 +106,27 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # GHSA-gcqx-w48m-w2h4 (deepmerge mergeObject() prototype pollution, low
-      # severity) is deliberately ignored here: deepmerge 4.3.1 is the latest
-      # version ever published to npm -- there is no patched release to
-      # upgrade to, via shadcn's own devDependency tree (dev-only codegen
-      # tooling, not shipped). Revisit if deepmerge ever cuts a fixed release,
-      # or drop the dependency entirely if it stays unmaintained.
+      # Two advisories deliberately ignored here, both with no fix to
+      # upgrade to -- revisit each if/when that changes, or drop the
+      # dependency pulling it in if it stays unmaintained:
+      #  - GHSA-gcqx-w48m-w2h4 (deepmerge mergeObject() prototype pollution,
+      #    low severity): deepmerge 4.3.1 is the latest version ever
+      #    published to npm, via shadcn's own devDependency tree (dev-only
+      #    codegen tooling, not shipped). No longer showing up in scans as of
+      #    this comment -- kept in case the advisory data is reinstated;
+      #    `bun audit --ignore` silently no-ops on an advisory that isn't
+      #    present, so this is harmless either way.
+      #  - GHSA-fc5q-39xc-vjpf (picomatch ReDoS via repeated extglobs, high
+      #    severity): 4.0.7 is the latest release and is still affected; no
+      #    fixed version exists yet. Reached only via dev-time tooling
+      #    (changesets' own release tooling, shadcn's codegen tree, tsup's
+      #    bundler tree, @tailwindcss/cli's file watcher) -- none of it
+      #    processes attacker-controlled glob patterns at runtime, so the
+      #    abstract "high" severity doesn't reflect this repo's actual
+      #    exposure. `bun audit --prod` (below, no ignores) confirms none of
+      #    these chains reach anything actually shipped.
       - name: Audit dependencies
-        run: bun audit --ignore=GHSA-gcqx-w48m-w2h4
+        run: bun audit --ignore=GHSA-gcqx-w48m-w2h4 --ignore=GHSA-fc5q-39xc-vjpf
 
       # Guard the production-only graph separately: anything in what's actually
       # shipped must be clean with NO ignores.
