@@ -48,37 +48,37 @@ describe("IsrCache", () => {
     expect(cache.size).toBe(0);
   });
 
-  test("evicts oldest entries past maxEntries (LRU)", () => {
+  test("evicts oldest entries past maxEntries (LRU)", async () => {
     const cache = new IsrCache(2);
-    cache.set("/1", "one", "n1");
-    cache.set("/2", "two", "n2");
-    cache.set("/3", "three", "n3");
+    await cache.set("/1", "one", "n1");
+    await cache.set("/2", "two", "n2");
+    await cache.set("/3", "three", "n3");
     expect(cache.size).toBe(2);
-    expect(cache.get("/1")).toBeUndefined();
+    expect(await cache.get("/1")).toBeUndefined();
 
     // Touching /2 makes it most-recently-used, so /3 is evicted next.
-    expect(cache.get("/2")?.html).toBe("two");
-    cache.set("/4", "four", "n4");
-    expect(cache.get("/3")).toBeUndefined();
-    expect(cache.get("/4")?.html).toBe("four");
+    expect((await cache.get("/2"))?.html).toBe("two");
+    await cache.set("/4", "four", "n4");
+    expect(await cache.get("/3")).toBeUndefined();
+    expect((await cache.get("/4"))?.html).toBe("four");
   });
 
-  test("deletePath purges every query variant under a pathname", () => {
+  test("deletePath purges every query variant under a pathname", async () => {
     const cache = new IsrCache();
-    cache.set("/search?q=alpha", "a", "n1");
-    cache.set("/search?q=beta", "b", "n2");
-    cache.set("/other", "o", "n3");
+    await cache.set("/search?q=alpha", "a", "n1");
+    await cache.set("/search?q=beta", "b", "n2");
+    await cache.set("/other", "o", "n3");
 
-    expect(cache.deletePath("/search")).toBe(2);
+    expect(await cache.deletePath("/search")).toBe(2);
     expect(cache.size).toBe(1);
-    expect(cache.get("/other")?.html).toBe("o");
+    expect((await cache.get("/other"))?.html).toBe("o");
   });
 
-  test("clear empties everything", () => {
+  test("clear empties everything", async () => {
     const cache = new IsrCache();
-    cache.set("/1", "one", "n1");
-    cache.set("/2", "two", "n2");
-    cache.clear();
+    await cache.set("/1", "one", "n1");
+    await cache.set("/2", "two", "n2");
+    await cache.clear();
     expect(cache.size).toBe(0);
   });
 });

@@ -43,7 +43,12 @@ import {
 } from "./security/body-size";
 import { type CsrfOptions, checkCsrf, originFromHeader, requestOrigin } from "./security/csrf";
 import { applySecurityHeaders, type SecurityHeadersOptions } from "./security/headers";
-import { type ComputeResult, IsrCache, isrCacheKey } from "./security/isr-cache";
+import {
+  type ComputeResult,
+  IsrCache,
+  type IsrCacheStore,
+  isrCacheKey,
+} from "./security/isr-cache";
 import {
   createRateLimiter,
   type RateLimitOptions,
@@ -88,6 +93,13 @@ export interface CreateAppOptions {
     headers?: SecurityHeadersOptions | false;
     /** Rate limiting applied ahead of all routing. Pass false to disable entirely. */
     rateLimit?: RateLimitOptions | false;
+    /**
+     * Shared ISR cache store (e.g. `createRedisIsrCacheStore()`) for
+     * multi-instance deployments, so `/__x/revalidate` purges the cache
+     * every replica serves, not just the one that handled the request.
+     * In-memory per-process by default.
+     */
+    isrCache?: { store?: IsrCacheStore; maxEntries?: number };
   };
   observability?: {
     /** Structured JSON request logging. Default: true. */
@@ -337,7 +349,10 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
   let notFoundComponent: ComponentType<RouteProps> = DefaultNotFound;
   let notFoundLayout: ComponentType<{ children: ReactNode }> | undefined;
   const serverFnHandler = getServerFunctionHandler(options.security?.csrf);
-  const staticCache = new IsrCache(500);
+  const staticCache = new IsrCache(
+    options.security?.isrCache?.maxEntries ?? 500,
+    options.security?.isrCache?.store,
+  );
   let actionModules = new Map<string, ActionModuleInfo>();
   const islandBundleCache = new BoundedCache<string, string[]>(
     options.islandCacheMaxEntries ?? 500,
@@ -570,7 +585,7 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
           // dynamic path (e.g. /blog/one and /blog/two for [slug].tsx) would
           // share one cache entry and leak content across URLs.
           if (revalidateSeconds > 0) {
-            const cached = staticCache.get(cacheKey);
+            const cached = await staticCache.get(cacheKey);
             if (cached && Date.now() - cached.timestamp < revalidateSeconds * 1000) {
               const res = new Response(cached.html, {
                 headers: {
@@ -583,7 +598,7 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
             }
             // Stale entry: drop it so the miss path recomputes instead of
             // getOrCompute serving the expired HTML back to us.
-            if (cached) staticCache.delete(cacheKey);
+            if (cached) await staticCache.delete(cacheKey);
           }
 
           // Loader + render, shared by the miss path. Hoisted so a stampede of
@@ -1058,10 +1073,10 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
       // Keys are full URLs now (pathname + search); a revalidation request
       // names a path, so purge every cached entry under that pathname —
       // query variants of the same page are all stale together.
-      const removed = staticCache.deletePath(new URL(body.path, "http://localhost").pathname);
+      const removed = await staticCache.deletePath(new URL(body.path, "http://localhost").pathname);
       return new Response(`Revalidated: ${body.path} (${removed} cached variant(s))`);
     }
-    staticCache.clear();
+    await staticCache.clear();
     return new Response("Revalidated all");
   }
 
