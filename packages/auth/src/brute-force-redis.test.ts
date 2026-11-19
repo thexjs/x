@@ -11,7 +11,16 @@ import { createRedisBruteForceStoreFromClient, type RedisClientLike } from "./br
 class FakeRedis {
   private buckets = new Map<string, { failures: number; resetAt: number }>();
   private inflight = new Map<string, number>();
-  private now = () => Date.now();
+  // A fixed snapshot taken once at construction, not live Date.now() on every
+  // call: a test that fires several sequential awaited requests against the
+  // same nominal "now" must see the exact same clock value across all of
+  // them, or assertions comparing `resetAt - now` drift by however many
+  // milliseconds elapsed on whatever machine happens to run the suite --
+  // negligible locally, enough to tip a boundary check (e.g. an exact
+  // backoff cap) on a slower/loaded CI runner. `setNow` still allows a test
+  // to explicitly advance the clock to simulate time passing.
+  private fixedNow = Date.now();
+  private now = () => this.fixedNow;
 
   client(): RedisClientLike {
     return { sendCommand: (cmd, ...args) => this.run(cmd, ...args) };
