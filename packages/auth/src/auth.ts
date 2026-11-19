@@ -68,8 +68,9 @@ export interface AuthConfig {
    * behind the same NAT — remain unaffected, since each has its own IP). If the
    * identifier or client IP can't be determined, only the *other* axis is
    * enforced rather than folding everyone into one global bucket. In-memory
-   * (single-process). Default: 5 failed attempts, 15-minute base window with
-   * exponential backoff.
+   * (single-process) by default; pass `store: createRedisBruteForceStore()`
+   * to share the lockout state across replicas. Default: 5 failed attempts,
+   * 15-minute base window with exponential backoff.
    */
   loginBruteForce?: BruteForceOptions;
   /** Session lifetime in seconds. Default: 7 days. */
@@ -426,15 +427,22 @@ export function defineAuth(config: AuthConfig): Auth {
     const accountKey = identifier !== "" ? bruteForce.accountKey(identifier) : null;
     const ipKey = bruteForce.ipKey(req);
 
-    // Reserve attempt slots synchronously BEFORE authorizing (no await between
-    // the capacity check and the bump). Reserving prevents the TOCTOU race
-    // where N parallel bad-password requests all pass the read-only status
-    // check before any commits a failure, which would let a credential-stuffing
-    // burst sail past `maxAttempts`. The reservation is released on success or
+    // Reserve attempt slots BEFORE authorizing. Each key's own check-then-bump
+    // is atomic (in-process, or via a Lua script in the Redis store) even
+    // though the outer calls here are awaited in sequence — that sequencing
+    // just decides when *this* request reserves each key, not whether a
+    // single reserve() call's internal check and bump can be interleaved by
+    // another caller. This is what prevents the TOCTOU race where N parallel
+    // bad-password requests all pass the read-only status check before any
+    // commits a failure, which would let a credential-stuffing burst sail
+    // past `maxAttempts`. The reservation is released on success or
     // converted into a real failure below.
     const accountReserve =
-      accountKey === null ? null : { key: accountKey, result: bruteForce.reserve(accountKey) };
-    const ipReserve = ipKey === null ? null : { key: ipKey, result: bruteForce.reserve(ipKey) };
+      accountKey === null
+        ? null
+        : { key: accountKey, result: await bruteForce.reserve(accountKey) };
+    const ipReserve =
+      ipKey === null ? null : { key: ipKey, result: await bruteForce.reserve(ipKey) };
     const status = {
       // A missing axis is skipped (treated as allowed), not as a lockout.
       ok:
@@ -446,8 +454,8 @@ export function defineAuth(config: AuthConfig): Auth {
     if (!status.ok) {
       // Roll back any reservation we did make so a rejected axis doesn't leak
       // an in-flight slot for the other.
-      if (accountReserve?.result.ok) bruteForce.release(accountReserve.key);
-      if (ipReserve?.result.ok) bruteForce.release(ipReserve.key);
+      if (accountReserve?.result.ok) await bruteForce.release(accountReserve.key);
+      if (ipReserve?.result.ok) await bruteForce.release(ipReserve.key);
       auditLoginFailure({
         userId: null,
         provider: provider.id,
@@ -472,10 +480,10 @@ export function defineAuth(config: AuthConfig): Auth {
     try {
       user = await provider.authorize(params, { request: req });
       if (!user?.id) {
-        // Convert the reservations into real failures (the synchronous bump is
-        // what closes the race).
-        if (accountKey !== null) bruteForce.recordFailure(accountKey);
-        if (ipKey !== null) bruteForce.recordFailure(ipKey);
+        // Convert the reservations into real failures (the atomic bump inside
+        // recordFailure itself, not this await, is what closes the race).
+        if (accountKey !== null) await bruteForce.recordFailure(accountKey);
+        if (ipKey !== null) await bruteForce.recordFailure(ipKey);
         auditLoginFailure({
           userId: null,
           provider: provider.id,
@@ -501,8 +509,8 @@ export function defineAuth(config: AuthConfig): Auth {
       // Roll back both reservations on every exit path — success rolls them
       // back, failures release the slot after it became a recorded failure, and
       // a throw must still release them so capacity is never leaked.
-      if (accountKey !== null) bruteForce.release(accountKey);
-      if (ipKey !== null) bruteForce.release(ipKey);
+      if (accountKey !== null) await bruteForce.release(accountKey);
+      if (ipKey !== null) await bruteForce.release(ipKey);
     }
     // Reaching here means `authorize` resolved a user with an id (anything else
     // returned above). TS can't narrow `user` across the try/finally boundary,
@@ -512,7 +520,7 @@ export function defineAuth(config: AuthConfig): Auth {
     // until its window naturally expires: it aggregates attempts across *all*
     // accounts from that IP, and clearing it on any successful login would let
     // an attacker who owns one account keep resetting the spray counter.
-    if (accountKey !== null) bruteForce.reset(accountKey);
+    if (accountKey !== null) await bruteForce.reset(accountKey);
     return establishSession(user, provider.id, undefined, req);
   };
 
