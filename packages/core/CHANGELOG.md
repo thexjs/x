@@ -1,5 +1,12 @@
 # @thexjs/core
 
+## 1.11.1
+
+### Patch Changes
+
+- 006667b: Close a `javascript:` link sanitizer bypass in `renderMarkdown`: a leading C0 control character other than tab/newline/CR (e.g. `\x01`) survived the old `stripUrlControlChars` (which only stripped `\t\n\r`), so a markdown link like `[x](\x01javascript:alert(1))` was treated as a safe relative URL and emitted as a live `javascript:` href — real browsers strip leading C0 controls before scheme parsing (WHATWG URL spec), so the link executed on click despite the sanitizer seeing no recognizable scheme. `stripUrlControlChars` now strips the full C0 control range (`\x00`-`\x1F`), not just tab/newline/CR.
+- 2328a6b: Fix the `Secure` cookie flag silently dropping on any deployment where `NODE_ENV` isn't the exact literal string `"production"` — a platform that names its env var something else, or a staging deployment genuinely served over HTTPS, no longer loses `Secure` on the CSRF double-submit cookie, the session cookie, or the OAuth state/PKCE cookies. Added `isSecureRequest(req)` to `@thexjs/core`, checking the request's own URL scheme (and `X-Forwarded-Proto`, only when `configureTrustedProxy({ trustForwardedHeaders: true })` is set — the same trust boundary `clientIpFromRequest` already uses) as an independent signal alongside the existing `NODE_ENV`/`forceSecureCookie` checks, not a replacement for them.
+
 ## 1.11.0
 
 ### Minor Changes
