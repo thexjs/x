@@ -1,11 +1,24 @@
-import { BarChart3, LayoutDashboard, Settings, User } from "lucide-react";
+import { Island } from "@thexjs/core";
+import { BarChart3, LayoutDashboard, Settings } from "lucide-react";
 import type { ReactNode } from "react";
-import { cn } from "../lib/utils";
+import SidebarUserBadge from "../../components/sidebar-user-badge";
+import { cn } from "../../lib/utils";
 
 interface LayoutProps {
   children: ReactNode;
   page?: string;
 }
+
+// Declared as a *path string*, not the live `SidebarUserBadge` reference
+// imported above for SSR -- this layout sits in the chain for every
+// /dashboard/* route, including dashboard/index.tsx, whose own loader
+// dynamically imports lib/auth (defineAuth, node:crypto). A live-reference
+// island here would force the client hydration entry to import the whole
+// layout chain (route included) to resolve it, leaking that loader's
+// imports into the browser bundle -- the same bug closed in
+// packages/core/src/island-bundle.ts's `resolveIslandPaths`. A path-backed
+// entry imports this file directly instead.
+export const islands = { SidebarUserBadge: "../../components/sidebar-user-badge" };
 
 const sidebarLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -45,15 +58,9 @@ export default function DashboardLayout({ children, page }: LayoutProps) {
           })}
         </nav>
         <div className="border-t border-sidebar-border p-4">
-          <div className="flex items-center gap-3 rounded-lg px-3 py-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-              <User className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-medium text-sidebar-foreground">John Doe</span>
-              <span className="text-xs text-sidebar-foreground/60">john@example.com</span>
-            </div>
-          </div>
+          <Island name="SidebarUserBadge" client="load">
+            <SidebarUserBadge />
+          </Island>
         </div>
       </aside>
       <div className="flex flex-1 flex-col overflow-hidden">
