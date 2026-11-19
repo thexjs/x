@@ -54,6 +54,7 @@ import {
   type RateLimitOptions,
   rateLimitMiddleware,
 } from "./security/rate-limit";
+import { configureTrustedProxy } from "./security/trusted-proxy";
 import {
   getServerFunctionHandler,
   registerServerFunctions,
@@ -87,6 +88,28 @@ export interface CreateAppOptions {
    */
   stylesheetHref?: string;
   security?: {
+    /**
+     * Trusts `X-Forwarded-For`/`X-Forwarded-Proto`/`X-Real-IP` for client IP
+     * and scheme resolution (brute-force guards, rate limiting, audit
+     * trails, the `Secure` cookie fallback). Default: `false` -- a client
+     * can set these headers to any value, so trusting them blindly would
+     * let an attacker spoof their IP and defeat IP-based protections.
+     *
+     * Only set this to `true` when the deployment sits behind a reverse
+     * proxy / edge that scrubs or overwrites these headers before they
+     * reach this process (NGINX, Cloudflare, an ALB, a bare Node reverse
+     * proxy you control) -- never when the app is reachable directly, or
+     * behind a proxy that forwards whatever the client sent unmodified.
+     *
+     * This is the `x.config.ts`-level opt-in `trusted-proxy.ts`'s own
+     * `configureTrustedProxy()` doc comment already describes. Setting this
+     * to `true` calls it once at boot; setting it to `false` or leaving it
+     * unset does *not* call it at all, so an adapter that already made its
+     * own trust decision at its own initialization point (e.g.
+     * `@thexjs/adapter-vercel`, which always trusts Vercel's edge) is never
+     * overridden back to untrusted by this option being absent.
+     */
+    trustProxy?: boolean;
     /** CSRF protection for /__x/actions/* requests. Origin/Referer verification is always on unless disabled. */
     csrf?: CsrfOptions;
     /** Security response headers (CSP, HSTS, X-Frame-Options, ...). Pass false to disable entirely. */
@@ -406,6 +429,14 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
 
   if (options.observability?.errorReporter) {
     setErrorReporter(options.observability.errorReporter);
+  }
+  // Only ever opts in, never opts out: an adapter that already made its own
+  // trust decision at its own initialization point (e.g. adapter-vercel,
+  // which always trusts Vercel's edge) must not be silently overridden back
+  // to untrusted just because this option is absent/false here -- false is
+  // also the pre-existing global default, so there is nothing to "turn off".
+  if (options.security?.trustProxy === true) {
+    configureTrustedProxy({ trustForwardedHeaders: true });
   }
   const healthHandler = createHealthCheckHandler(options.observability?.health ?? {});
   const metricsReporter = options.observability?.metrics;

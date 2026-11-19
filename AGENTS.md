@@ -151,6 +151,7 @@ bun test packages/core/src/router.test.ts
 - **Env isolation**: variables not prefixed with `THEXJS_PUBLIC_` (or custom prefix) are server-only. The build step (`security/env-isolation.ts`) fails if client code references non-prefixed env keys.
 - **Security headers** are applied by default (CSP, HSTS, X-Frame-Options, etc.). Pass `security: { headers: false }` to disable.
 - **Rate limiting** is enabled by default. Pass `security: { rateLimit: false }` to disable.
+- **Forwarded headers (`X-Forwarded-For`/`-Proto`, `X-Real-IP`) are ignored by default** — a client can set these to any value, so trusting them blindly would let an attacker spoof their IP and defeat IP-based rate limiting/brute-force guards. Without opting in, a non-Vercel deployment behind _any_ reverse proxy (NGINX, Cloudflare, an ALB) silently loses IP-based protection — not a bug, but easy to miss. Pass `security: { trustProxy: true }` in `x.config.ts` **only** when the deployment sits behind a proxy/edge that scrubs or overwrites these headers before they reach the app (never when reachable directly, or behind a proxy that forwards whatever the client sent). `@thexjs/adapter-vercel` already opts in for you; other adapters/direct `x start` deployments don't.
 
 ## Agent skills
 
