@@ -71,6 +71,11 @@ When several routes could match one URL, the most specific one wins:
 
 Underlying scanners (`scanRoutes`, `scanPages`, `scanApiDir`, `scanLayouts`, `scanLayoutsDir`, `scanMiddleware`, `scanNotFound`) and chain resolvers (`findLayoutChain`, `findMiddlewareChain`) are exported if you need to build custom tooling on top of the same conventions.
 
+### Two ways to declare a layout
+
+- **Nested `_layout.tsx`** (scoped): wraps only the routes in its own directory and below. `src/pages/dashboard/_layout.tsx` wraps `/dashboard`, `/dashboard/settings`, etc. — nothing outside that directory. Use this for anything that should apply to a subset of routes.
+- **`layoutsDir`** (global): set `layoutsDir: "src/layouts"` in `x.config.ts` to point at a directory of layout files. This option has **no default** — if it's unset, no dedicated layouts dir is scanned at all, nested `_layout.tsx` files are the only mechanism. When you do set it, **every file in that directory wraps every route in the app**, unconditionally — there's no per-file scoping. A `src/layouts/main.tsx` and a `src/layouts/admin.tsx` would _both_ wrap every page, nested inside each other; if only `main.tsx` is meant to be truly global, keep it the only file in `layoutsDir` and put anything subtree-specific (a dashboard shell, say) at `src/pages/dashboard/_layout.tsx` instead.
+
 ## Route modes: static vs. server
 
 Every page defaults to **server-rendered (SSR)**. Opt into build-time prerendering per page:
