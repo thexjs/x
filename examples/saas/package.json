@@ -8,6 +8,7 @@
     "start": "bun ../../packages/cli/src/index.ts start"
   },
   "dependencies": {
+    "@thexjs/auth": "workspace:*",
     "@thexjs/core": "workspace:*",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",

@@ -1,5 +1,5 @@
-import { Island } from "@thexjs/core";
 import type { RouteProps } from "@thexjs/core";
+import { Island } from "@thexjs/core";
 import DashboardActions from "../../components/dashboard-actions";
 import Head from "../../components/Head";
 

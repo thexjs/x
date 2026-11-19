@@ -1,11 +1,10 @@
 import type { LoaderArgs, RouteProps } from "@thexjs/core";
-import { AlertTriangle, Bell, Save, User } from "lucide-react";
+import { AlertTriangle, Bell, LogOut, Save, User } from "lucide-react";
 
 export async function loader({ request }: LoaderArgs) {
-  const { parseSessionCookie, getSession } = await import("../../lib/auth");
-  const token = parseSessionCookie(request.headers.get("Cookie"));
-  const session = getSession(token);
-  return { username: session?.username ?? "User" };
+  const { auth } = await import("../../lib/auth");
+  const session = await auth.getSession(request);
+  return { username: session?.user.name ?? session?.user.email ?? "User" };
 }
 
 export default function SettingsPage({ loaderData }: RouteProps) {
@@ -84,6 +83,30 @@ export default function SettingsPage({ loaderData }: RouteProps) {
               </div>
             ),
           )}
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border bg-card">
+        <div className="flex items-center gap-3 border-b border-border px-6 py-4">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+            <LogOut className="h-5 w-5" />
+          </div>
+          <h3 className="text-lg font-semibold text-card-foreground">Session</h3>
+        </div>
+        <div className="p-6">
+          {/* Plain native form POST -- no client JS needed. This page ships
+              as static HTML with no island, so a React onClick handler here
+              would never hydrate; @thexjs/auth's signout endpoint accepts a
+              real browser form submission directly. */}
+          <form method="POST" action="/api/auth/signout">
+            <button
+              type="submit"
+              className="inline-flex items-center gap-2 rounded-xl border border-border bg-background px-5 py-2.5 text-sm font-semibold text-foreground transition-all hover:bg-muted"
+            >
+              <LogOut className="h-4 w-4" />
+              Sign out
+            </button>
+          </form>
         </div>
       </div>
 
