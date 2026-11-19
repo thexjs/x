@@ -1,11 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { renderToString } from "react-dom/server";
 import { unmountIslandRoots } from "./client-nav";
 import { createIslandRegistry, Island, IslandProvider } from "./island";
-import { generateHydrateEntry } from "./island-bundle";
+import {
+  buildIslandBundleInMemory,
+  generateHydrateEntry,
+  resolveIslandPaths,
+} from "./island-bundle";
 
 declare global {
   interface Window {
@@ -44,6 +48,57 @@ export function CleanupTracker() {
 export const islands = { CleanupTracker };
 `;
 
+// Fixtures for the #174-adjacent bug: a route combining a server-only loader
+// (something that touches node:crypto, same as the real @thexjs/auth case
+// that surfaced this) with an `islands` export. Historically that always
+// leaked the loader's imports into the client bundle, because resolving
+// `Route.islands?.[name]` required evaluating the whole module. A
+// *string*-valued island entry should resolve via a direct import of that
+// path instead, never touching the route module (or its loader) at all.
+const LEAKY_HELPER_PATH = join(FIXTURE_DIR, "leaky-loader-helper.ts");
+const LEAKY_HELPER_SOURCE = `import { timingSafeEqual } from "node:crypto";
+export function checkSecret(a: Uint8Array, b: Uint8Array) {
+  return timingSafeEqual(a, b);
+}
+`;
+
+const PATH_ISLAND_PATH = join(FIXTURE_DIR, "path-island.tsx");
+const PATH_ISLAND_SOURCE = `export default function PathIsland() {
+  return <button>path island</button>;
+}
+`;
+
+const LEAKY_ROUTE_PATH = join(FIXTURE_DIR, "leaky-route.tsx");
+const LEAKY_ROUTE_SOURCE = `import { checkSecret } from "./leaky-loader-helper";
+
+export async function loader() {
+  checkSecret(new Uint8Array([1]), new Uint8Array([1]));
+  return {};
+}
+
+export function InlineIsland() {
+  return <button>inline island</button>;
+}
+
+export const islands = {
+  InlineIsland,
+  PathIsland: "./path-island",
+};
+`;
+
+const LEAKY_LAYOUT_PATH = join(FIXTURE_DIR, "leaky-layout.tsx");
+const LEAKY_LAYOUT_SOURCE = `export const islands = { LayoutPathIsland: "./path-island" };
+export default function Layout({ children }) {
+  return children;
+}
+`;
+
+const ROUTE_NO_ISLANDS_PATH = join(FIXTURE_DIR, "route-no-islands.tsx");
+const ROUTE_NO_ISLANDS_SOURCE = `export default function Page() {
+  return <div>no islands here</div>;
+}
+`;
+
 // SSR an island exactly as the request pipeline does (IslandProvider + Island),
 // so the markup that reaches the browser carries the data-island wrapper.
 async function ssrIsland(): Promise<string> {
@@ -75,6 +130,11 @@ beforeAll(() => {
   mkdirSync(FIXTURE_DIR, { recursive: true });
   writeFileSync(ROUTE_PATH, ROUTE_SOURCE);
   writeFileSync(CLEANUP_ROUTE_PATH, CLEANUP_ROUTE_SOURCE);
+  writeFileSync(LEAKY_HELPER_PATH, LEAKY_HELPER_SOURCE);
+  writeFileSync(PATH_ISLAND_PATH, PATH_ISLAND_SOURCE);
+  writeFileSync(LEAKY_ROUTE_PATH, LEAKY_ROUTE_SOURCE);
+  writeFileSync(LEAKY_LAYOUT_PATH, LEAKY_LAYOUT_SOURCE);
+  writeFileSync(ROUTE_NO_ISLANDS_PATH, ROUTE_NO_ISLANDS_SOURCE);
   GlobalRegistrator.register();
 });
 
@@ -196,5 +256,102 @@ describe("island root unmount on client-nav (#158)", () => {
     await tick();
     expect(window.__xTestCleanupCount).toBe(2);
     expect(window.__xIslandRoots?.length).toBe(0);
+  });
+});
+
+describe("resolveIslandPaths", () => {
+  test("resolves a string-valued island entry relative to its owning file's directory", async () => {
+    const paths = await resolveIslandPaths(LEAKY_ROUTE_PATH, [], ["PathIsland"]);
+    expect(paths).toEqual({
+      PathIsland: resolve(dirname(LEAKY_ROUTE_PATH), "./path-island"),
+    });
+  });
+
+  test("a live component reference (not a string) is not included", async () => {
+    const paths = await resolveIslandPaths(LEAKY_ROUTE_PATH, [], ["InlineIsland", "PathIsland"]);
+    expect(Object.keys(paths)).toEqual(["PathIsland"]);
+  });
+
+  test("falls back to a layout's islands map, resolved relative to the layout's directory", async () => {
+    const paths = await resolveIslandPaths(
+      ROUTE_NO_ISLANDS_PATH,
+      [LEAKY_LAYOUT_PATH],
+      ["LayoutPathIsland"],
+    );
+    expect(paths).toEqual({
+      LayoutPathIsland: resolve(dirname(LEAKY_LAYOUT_PATH), "./path-island"),
+    });
+  });
+
+  test("the route's own entry wins over a layout's for the same name", async () => {
+    // LEAKY_ROUTE_PATH declares PathIsland itself; pairing it with a layout
+    // that (hypothetically) also declared it should still prefer the route's.
+    const paths = await resolveIslandPaths(LEAKY_ROUTE_PATH, [LEAKY_LAYOUT_PATH], ["PathIsland"]);
+    expect(paths.PathIsland).toBe(resolve(dirname(LEAKY_ROUTE_PATH), "./path-island"));
+  });
+
+  test("returns an empty map for a route with no islands export", async () => {
+    const paths = await resolveIslandPaths(ROUTE_NO_ISLANDS_PATH, [], ["Anything"]);
+    expect(paths).toEqual({});
+  });
+});
+
+describe("generateHydrateEntry: path-backed islands", () => {
+  test("omitting islandNames preserves the original always-import-Route contract", () => {
+    const entry = generateHydrateEntry(ROUTE_PATH);
+    expect(entry).toContain(`import * as Route from "${ROUTE_PATH}"`);
+  });
+
+  test("a path-backed island is statically imported directly, bypassing the route module", () => {
+    const entry = generateHydrateEntry(LEAKY_ROUTE_PATH, [], ["PathIsland"], {
+      PathIsland: PATH_ISLAND_PATH,
+    });
+    expect(entry).toContain(`import __x_island_0 from "${PATH_ISLAND_PATH}"`);
+    expect(entry).not.toContain("import * as Route");
+  });
+
+  test("a mix of path-backed and module-backed islands still imports Route for the latter", () => {
+    const entry = generateHydrateEntry(LEAKY_ROUTE_PATH, [], ["PathIsland", "InlineIsland"], {
+      PathIsland: PATH_ISLAND_PATH,
+    });
+    expect(entry).toContain(`import __x_island_0 from "${PATH_ISLAND_PATH}"`);
+    expect(entry).toContain(`import * as Route from "${LEAKY_ROUTE_PATH}"`);
+  });
+});
+
+describe("buildIslandBundleInMemory: server-only loader + islands co-location (regression)", () => {
+  const PROJECT_ROOT = join(import.meta.dir, "__fixtures__/islands-build-root");
+
+  afterAll(() => {
+    rmSync(PROJECT_ROOT, { recursive: true, force: true });
+  });
+
+  test("a path-backed island builds successfully even though the route's loader imports node:crypto", async () => {
+    const code = await buildIslandBundleInMemory(
+      LEAKY_ROUTE_PATH,
+      [],
+      ["PathIsland"],
+      new Map(),
+      PROJECT_ROOT,
+    );
+    // A failed build falls back to the non-interactive stub -- its presence
+    // would mean the leak reproduced despite PathIsland being path-backed.
+    expect(code).not.toContain("hydration fallback");
+    expect(code).not.toContain("timingSafeEqual");
+    expect(code).toContain("path island");
+  });
+
+  test("an inline (non-path-backed) island on the same route still reproduces the original leak", async () => {
+    // This is the control: proving the fix is specific to path-backed
+    // islands, not an accidental blanket fix that changed behavior for the
+    // pre-existing co-located pattern everywhere.
+    const code = await buildIslandBundleInMemory(
+      LEAKY_ROUTE_PATH,
+      [],
+      ["InlineIsland"],
+      new Map(),
+      PROJECT_ROOT,
+    );
+    expect(code).toContain("hydration fallback");
   });
 });
