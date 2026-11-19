@@ -17,6 +17,7 @@
       "name": "@thexjs/example-basic",
       "dependencies": {
         "@base-ui/react": "^1.9.0",
+        "@thexjs/auth": "workspace:*",
         "@thexjs/core": "workspace:*",
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",

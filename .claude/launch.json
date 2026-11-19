@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "examples-basic",
+      "runtimeExecutable": "bun",
+      "runtimeArgs": ["../../packages/cli/src/index.ts", "dev"],
+      "cwd": "examples/basic",
+      "port": 3000
+    }
+  ]
+}
