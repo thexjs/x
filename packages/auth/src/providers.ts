@@ -100,6 +100,23 @@ export interface OAuthTokens {
 }
 
 /**
+ * Params `buildAuthorizationUrl` derives itself and never lets provider
+ * config override, regardless of application order (#174). Letting
+ * `authorizationParams` clobber `state`/`code_challenge` would silently
+ * weaken or replace the CSRF/PKCE binding; letting it clobber `client_id`/
+ * `redirect_uri`/`response_type` would let config misconfigure the OAuth
+ * flow's own identity.
+ */
+const RESERVED_AUTHORIZATION_PARAMS = new Set([
+  "client_id",
+  "redirect_uri",
+  "response_type",
+  "state",
+  "code_challenge",
+  "code_challenge_method",
+]);
+
+/**
  * Builds the authorization URL for a sign-in redirect.
  *
  * Pass `codeChallenge` (the S256 challenge derived from a verifier you also
@@ -123,7 +140,10 @@ export function buildAuthorizationUrl(
     url.searchParams.set("code_challenge", codeChallenge);
     url.searchParams.set("code_challenge_method", "S256");
   }
-  for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+  for (const [key, value] of Object.entries(params)) {
+    if (RESERVED_AUTHORIZATION_PARAMS.has(key)) continue;
+    url.searchParams.set(key, value);
+  }
   return url.toString();
 }
 
