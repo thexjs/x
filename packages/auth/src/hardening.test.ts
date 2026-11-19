@@ -427,7 +427,7 @@ describe("auth hardening: brute-force guard internals", () => {
     }
   });
 
-  test("attacker-set X-Forwarded-For does not create separate IP buckets when untrusted", () => {
+  test("attacker-set X-Forwarded-For does not create separate IP buckets when untrusted", async () => {
     // Default: trustForwardedHeaders = false. Two requests with different
     // x-forwarded-for headers both resolve to null IP → same (null) bucket key.
     // The IP axis is simply skipped; the account axis still locks.
@@ -443,17 +443,17 @@ describe("auth hardening: brute-force guard internals", () => {
 
     // Both land in the same account bucket.
     const key = guard.accountKey("victim@example.com");
-    guard.recordFailure(key);
-    guard.recordFailure(key);
-    expect(guard.status(key).ok).toBe(false); // locked after 2 failures
+    await guard.recordFailure(key);
+    await guard.recordFailure(key);
+    expect((await guard.status(key)).ok).toBe(false); // locked after 2 failures
 
     // A fresh attempt from "attacker-B" is still locked — the account bucket
     // is shared regardless of spoofed IP headers.
-    expect(guard.status(key).ok).toBe(false);
+    expect((await guard.status(key)).ok).toBe(false);
     guard.dispose();
   });
 
-  test("genuinely trusted and consistent X-Forwarded-For lands in the same IP bucket", () => {
+  test("genuinely trusted and consistent X-Forwarded-For lands in the same IP bucket", async () => {
     configureTrustedProxy({ trustForwardedHeaders: true });
     try {
       const guard = createBruteForceGuard({ maxAttempts: 2, windowMs: 60_000 });
@@ -469,34 +469,34 @@ describe("auth hardening: brute-force guard internals", () => {
       const keyB = guard.ipKey(reqB) as string;
       expect(keyA).toBe(keyB);
 
-      guard.recordFailure(keyA);
-      guard.recordFailure(keyA);
-      expect(guard.status(keyA).ok).toBe(false);
-      expect(guard.status(keyB).ok).toBe(false); // same bucket
+      await guard.recordFailure(keyA);
+      await guard.recordFailure(keyA);
+      expect((await guard.status(keyA)).ok).toBe(false);
+      expect((await guard.status(keyB)).ok).toBe(false); // same bucket
       guard.dispose();
     } finally {
       resetTrustedProxy();
     }
   });
 
-  test("reserve is synchronous and caps in-flight attempts at maxAttempts (#168)", () => {
+  test("reserve caps in-flight attempts at maxAttempts, atomically (#168)", async () => {
     const guard = createBruteForceGuard({ maxAttempts: 3, windowMs: 60_000 });
     guard.dispose();
     const key = guard.accountKey("burst@example.com");
 
     // Three reservations are allowed (one per attempt slot)...
-    expect(guard.reserve(key).ok).toBe(true);
-    expect(guard.reserve(key).ok).toBe(true);
-    expect(guard.reserve(key).ok).toBe(true);
+    expect((await guard.reserve(key)).ok).toBe(true);
+    expect((await guard.reserve(key)).ok).toBe(true);
+    expect((await guard.reserve(key)).ok).toBe(true);
     // ...a fourth is refused immediately with no authorize work.
-    expect(guard.reserve(key).ok).toBe(false);
+    expect((await guard.reserve(key)).ok).toBe(false);
 
     // Releasing a slot (rollback on success) restores capacity.
-    guard.release(key);
-    expect(guard.reserve(key).ok).toBe(true);
+    await guard.release(key);
+    expect((await guard.reserve(key)).ok).toBe(true);
 
     // A reservation does not itself count as a persisted failure.
-    expect(guard.status(key).ok).toBe(true);
+    expect((await guard.status(key)).ok).toBe(true);
     guard.dispose();
   });
 
