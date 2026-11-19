@@ -2,10 +2,9 @@ import type { LoaderArgs, RouteProps } from "@thexjs/core";
 import { Activity, DollarSign, TrendingUp, Users } from "lucide-react";
 
 export async function loader({ request }: LoaderArgs) {
-  const { parseSessionCookie, getSession } = await import("../../lib/auth");
-  const token = parseSessionCookie(request.headers.get("Cookie"));
-  const session = getSession(token);
-  return { username: session?.username ?? "User" };
+  const { auth } = await import("../../lib/auth");
+  const session = await auth.getSession(request);
+  return { username: session?.user.name ?? session?.user.email ?? "User" };
 }
 
 const stats = [
