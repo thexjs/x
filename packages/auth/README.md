@@ -97,6 +97,18 @@ session.user; // { id, name?, email? } snapshot from sign-in
 - **OAuth state** — a `x_oauth_state` cookie challenge must match the `state` param on the callback (HMAC'd, 5-minute expiry), preventing login-CSRF / session-fixation via crafted callbacks.
 - **CSRF** — POST endpoints (`signin`, `signout`) run the core `checkCsrf` (Origin/Referer verification by default; pass `requireToken` for double-submit defense in depth) and reject non-conforming requests with `403`.
 - **Cookies** — `HttpOnly`, `SameSite=Lax`, `Secure` in production.
+- **Brute-force protection** — the credentials provider checks an account bucket and an IP bucket on every sign-in attempt (`loginBruteForce`, on by default: 5 attempts, 15-minute base window with exponential backoff). In-memory by default (single-process); pass a Redis-backed store to share lockout state across replicas:
+
+  ```ts
+  import { createRedisBruteForceStore } from "@thexjs/auth";
+
+  export const auth = defineAuth({
+    // ...
+    loginBruteForce: { store: createRedisBruteForceStore({ url: process.env.REDIS_URL }) },
+  });
+  ```
+
+  The Redis store has no non-atomic fallback if the server denies `EVAL` (scripting disabled, or a restrictive ACL) — it throws rather than silently running without the atomicity guarantee that closes the race across replicas.
 
 Set a **stable `secret`** in production. If omitted, a random per-process secret is generated and a warning printed, which means sessions won't survive restarts.
 
