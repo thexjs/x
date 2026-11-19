@@ -157,16 +157,27 @@ function decodeLinkUrl(url: string): string {
 }
 
 /**
- * Strips the control characters the WHATWG URL spec removes from a URL
- * wherever they occur before scheme parsing. A tab, newline, or carriage
- * return embedded in the scheme portion — `java\tscript:` — defeats a naive
- * scheme regex (which sees no scheme and assumes the link is safe) while a
- * real browser still executes the resulting `javascript:` link. The strip
- * must happen before scheme detection and before the value is written into
- * the emitted `href` so no raw control character leaks into the output.
+ * Strips every C0 control character (U+0000–U+001F, which includes tab,
+ * newline, and carriage return) from a URL wherever it occurs, before scheme
+ * parsing. A control character embedded in — or leading — the scheme portion
+ * defeats a naive scheme regex (which sees no scheme and assumes the link is
+ * safe) while a real browser still executes the resulting `javascript:`
+ * link: the WHATWG URL spec's basic parser strips leading/trailing C0
+ * controls (and tab/newline/CR everywhere) before scheme detection, so
+ * `\x01javascript:alert(1)` and `java\tscript:alert(1)` both resolve to a
+ * live `javascript:` URL in a real browser even though this function's
+ * output still shows no recognizable scheme to a naive regex. Stripping the
+ * full C0 range rather than only tab/newline/CR closes that gap; no
+ * legitimate `http`/`https`/`mailto` URL contains a raw control character; in
+ * particular, this closes the C0-control variant of the javascript: bypass
+ * this file already defends against (double-percent-encoding, scheme-
+ * embedded tab/newline). The strip must happen before scheme detection and
+ * before the value is written into the emitted `href` so no raw control
+ * character leaks into the output either way.
  */
 function stripUrlControlChars(url: string): string {
-  return url.replace(/[\t\n\r]/g, "");
+  // biome-ignore lint/suspicious/noControlCharactersInRegex: the whole point of this regex is matching C0 control characters -- that's the exact bypass class it closes (see the doc comment above), not an accidental literal control character in the source.
+  return url.replace(/[\x00-\x1F]/g, "");
 }
 
 /**
