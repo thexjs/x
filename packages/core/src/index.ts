@@ -166,6 +166,7 @@ export {
   type RateLimitStore,
   rateLimitMiddleware,
 } from "./security/rate-limit";
+export { isSecureRequest } from "./security/secure-request";
 export {
   configureTrustedProxy,
   isTrustedProxy,
