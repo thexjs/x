@@ -26,6 +26,22 @@ RUN bun install --frozen-lockfile
 
 COPY . .
 
+# `x build` always re-execs itself under NODE_ENV=production (so Bun.build
+# resolves React's production builds). The island bundler's
+# resolveIslandPaths now evaluates a route's module server-side at build time
+# too (to discover path-backed `islands` entries without leaking a loader's
+# imports into the client bundle) -- which means examples/basic's dashboard
+# route (real @thexjs/auth, not the old demo auth) gets imported during this
+# build step for the first time, and defineAuth() throws without a stable
+# `secret` under NODE_ENV=production -- exactly the guard that's supposed to
+# stop someone from accidentally deploying with a per-process random secret.
+# This placeholder only satisfies that check for this disposable build-stage
+# process; it is never copied into the production stage below (each Docker
+# stage starts with a fresh environment), and the actual running container
+# reads its own AUTH_SECRET from the deploy platform at startup,
+# independently.
+ENV AUTH_SECRET=docker-build-stage-placeholder-not-used-at-runtime
+
 # Typecheck the workspace, then build the basic example. `--cwd examples/basic`
 # makes projectDir /app/examples/basic, so `--outDir ../../dist` resolves to
 # /app/dist (matching the COPY below and DEPLOY.md).
