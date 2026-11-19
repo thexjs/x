@@ -116,7 +116,18 @@ export default defineConfig({
 ```
 
 The Redis store uses Bun's built-in `bun:redis` (no npm dependency) and
-connects lazily on first use. Expired buckets are swept automatically.
+connects lazily on first use. Expired buckets are swept automatically. If the
+Redis server denies scripting (`EVAL`), this store falls back to a
+non-atomic increment — rate limiting keeps working, just without the
+atomicity guarantee under concurrent requests to the same key.
+
+The ISR cache has the same per-process-by-default caveat: without a shared
+store, each replica revalidates and caches independently, so visitors can see
+stale content from one replica after another has already revalidated. Provide
+`createRedisIsrCacheStore` the same way for cluster-wide cache consistency.
+See [Brute-force protection](#brute-force-protection) below for the login
+guard's equivalent store — it does **not** share the non-atomic fallback
+behavior described above, by design.
 
 ## Environment variable isolation
 
@@ -175,10 +186,32 @@ security properties:
   secret generates a per-process value that doesn't survive restarts.
 
 The framework itself still ships the primitives you'd build auth on
-(cookies, middleware, server functions, data layer), and the `basic` and
-`saas` templates include a **demo** auth (hardcoded `admin` / `admin`, no
-password hashing, no expiry) that is explicitly marked DEMO ONLY — replace it
-with `@thexjs/auth` (or your own) before shipping.
+(cookies, middleware, server functions, data layer) if you want to roll your
+own. The `basic` and `saas` example apps are wired to real `@thexjs/auth`
+(hashed passwords, HMAC'd sessions, `requireAuth` middleware) — there is no
+hardcoded-credential demo auth left to replace.
+
+### Brute-force protection
+
+The credentials provider checks an account bucket and an IP bucket on every
+sign-in attempt (on by default: 5 attempts, 15-minute base window with
+exponential backoff). Like rate limiting and the ISR cache above, this guard
+is **in-memory per-process by default** — behind multiple replicas, provide a
+shared store so the limit is enforced cluster-wide, not per-replica:
+
+```ts
+import { createRedisBruteForceStore } from "@thexjs/auth";
+
+export const auth = defineAuth({
+  // ...
+  loginBruteForce: { store: createRedisBruteForceStore({ url: process.env.REDIS_URL }) },
+});
+```
+
+Unlike the rate-limit store above, this one has **no non-atomic fallback** if
+the Redis server denies scripting (`EVAL`) — it throws instead of silently
+running without the atomicity guarantee that closes the race across
+replicas. Grant `EVAL` on the Redis user/ACL rather than relying on a degraded mode.
 
 ## Health endpoints
 
