@@ -157,6 +157,7 @@ export {
   buildSecurityHeaders,
   type SecurityHeadersOptions,
 } from "./security/headers";
+export { createRedisIsrCacheStore, type IsrCacheStore } from "./security/isr-cache";
 export {
   createRateLimiter,
   createRedisRateLimitStore,
