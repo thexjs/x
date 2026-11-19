@@ -344,6 +344,31 @@ describe("renderMarkdown link URL sanitization", () => {
     expect(html).not.toContain("\t");
   });
 
+  test("rejects a javascript: URL hidden behind a leading C0 control character", () => {
+    // A leading \x01 (not tab/LF/CR) used to survive the sanitizer: the
+    // scheme regex saw no recognizable scheme and isSafeLinkUrl treated the
+    // whole thing as a safe relative URL, emitting a live javascript: href.
+    // Real browsers strip leading C0 controls before scheme parsing (WHATWG
+    // URL spec), so this executed on click despite looking "safe" here.
+    const html = renderMarkdown("[run](\x01javascript:alert(document.cookie))");
+    expect(html).not.toContain("<a");
+    expect(html).not.toContain("href");
+    expect(html).toContain("run");
+  });
+
+  test("rejects a javascript: URL with a C0 control character splitting the scheme", () => {
+    const html = renderMarkdown("[run](java\x0Bscript:alert(1))");
+    expect(html).not.toContain("<a");
+    expect(html).not.toContain("href");
+    expect(html).toContain("run");
+  });
+
+  test("strips a non-tab/newline C0 control character from a safe URL and renders the cleaned href", () => {
+    const html = renderMarkdown("[docs](https://example.com/\x01docs)");
+    expect(html).toContain('<a href="https://example.com/docs">docs</a>');
+    expect(html).not.toContain("\x01");
+  });
+
   test("rejects a data: URL", () => {
     const html = renderMarkdown(
       "[x](data:text/html,\u003cscript\u003ealert(1)\u003c/script\u003e)",
