@@ -22,13 +22,14 @@ function signInRequest(
   email: string,
   password: string,
   extra: Record<string, string> = {},
+  baseUrl: string = BASE_URL,
 ): Request {
   const form = new FormData();
   form.set("email", email);
   form.set("password", password);
-  return new Request(`${BASE_URL}/api/auth/signin/local`, {
+  return new Request(`${baseUrl}/api/auth/signin/local`, {
     method: "POST",
-    headers: { origin: BASE_URL, ...extra },
+    headers: { origin: baseUrl, ...extra },
     body: form,
   });
 }
@@ -599,6 +600,30 @@ describe("auth hardening: secure cookies", () => {
     const setCookie = res.headers.getSetCookie()[0] ?? "";
     expect(setCookie).not.toContain("Secure");
     expect(setCookie).toContain("HttpOnly");
+    db.close();
+  });
+
+  test('a genuinely HTTPS request still gets Secure even when NODE_ENV isn\'t exactly "production"', async () => {
+    // A platform that names its production env var something else (or a
+    // staging deployment genuinely served over HTTPS) must not silently
+    // lose Secure just because NODE_ENV isn't the exact literal string
+    // "production" -- the request's own scheme is an independent signal.
+    const db = new Database(":memory:");
+    const auth = defineAuth({
+      secret: "test-secret",
+      store: createSQLiteSessionStore({ db }),
+      providers: [credentialsProvider],
+    });
+    const res = await auth.handleRequest(
+      signInRequest(
+        "admin@example.com",
+        "correct horse battery staple",
+        {},
+        "https://app.example.com",
+      ),
+    );
+    const setCookie = res.headers.getSetCookie()[0] ?? "";
+    expect(setCookie).toContain("Secure");
     db.close();
   });
 });

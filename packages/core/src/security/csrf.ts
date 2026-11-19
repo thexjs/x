@@ -11,14 +11,25 @@
  *    `x-csrf-token` request header on mutating requests.
  */
 
+import { isSecureRequest } from "./secure-request";
+
 const CSRF_COOKIE_NAME = "x_csrf_token";
 const CSRF_HEADER_NAME = "x-csrf-token";
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 
-// Always sent over HTTPS in production deployments. The Secure flag prevents
-// the cookie from leaking over plain HTTP if a client ever hits the HTTP
-// endpoint directly.
-const SECURE_COOKIE_FLAG = process.env.NODE_ENV === "production" ? "; Secure" : "";
+/**
+ * The Secure flag prevents the cookie from leaking over plain HTTP if a
+ * client ever hits an HTTP endpoint directly. `NODE_ENV === "production"` is
+ * the common case, but checked alongside the request's actual scheme
+ * (`isSecureRequest`) rather than instead of it — a platform that names its
+ * env var something else, or a staging deployment genuinely served over
+ * HTTPS, must not silently lose Secure just because `NODE_ENV` isn't the
+ * exact literal string "production".
+ */
+function secureCookieFlag(req: Request): string {
+  const secure = process.env.NODE_ENV === "production" || isSecureRequest(req);
+  return secure ? "; Secure" : "";
+}
 
 export interface CsrfOptions {
   /** Origins considered same-site, e.g. ["https://example.com"]. */
@@ -138,7 +149,7 @@ export function withCsrfCookie(req: Request, res: Response): Response {
   const headers = new Headers(res.headers);
   headers.append(
     "Set-Cookie",
-    `${CSRF_COOKIE_NAME}=${token}; Path=/; SameSite=Lax${SECURE_COOKIE_FLAG}`,
+    `${CSRF_COOKIE_NAME}=${token}; Path=/; SameSite=Lax${secureCookieFlag(req)}`,
   );
   return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
 }

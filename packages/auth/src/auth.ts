@@ -7,6 +7,7 @@ import {
   auditSessionRevoked,
   checkCsrf,
   clientIpFromRequest,
+  isSecureRequest,
   requestIdFromRequest,
 } from "@thexjs/core";
 import { type BruteForceOptions, createBruteForceGuard } from "./brute-force";
@@ -213,18 +214,30 @@ export function defineAuth(config: AuthConfig): Auth {
     return { verifier, challenge };
   };
 
-  const isSecure = (): boolean =>
-    config.forceSecureCookie === true || process.env.NODE_ENV === "production";
+  // `req` is optional: some callers (setSessionCookie/clearSessionCookie's
+  // programmatic form, a custom sign-in flow with no HTTP request at hand)
+  // genuinely have none, in which case only the explicit config/env check
+  // applies -- isSecureRequest needs a real Request to inspect a scheme or
+  // forwarded-proto header. When `req` is available, it adds a second,
+  // independent way to recognize an HTTPS deployment, so a platform that
+  // names its production env var something other than exactly
+  // `NODE_ENV=production` (or a staging deployment genuinely served over
+  // HTTPS) doesn't silently lose Secure on every auth cookie.
+  const isSecure = (req?: Request): boolean =>
+    config.forceSecureCookie === true ||
+    process.env.NODE_ENV === "production" ||
+    (req !== undefined && isSecureRequest(req));
 
   const bruteForce = createBruteForceGuard(config.loginBruteForce);
 
-  const cookieAttrs = (maxAge: number): string =>
-    `HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${isSecure() ? "; Secure" : ""}`;
+  const cookieAttrs = (maxAge: number, req?: Request): string =>
+    `HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${isSecure(req) ? "; Secure" : ""}`;
 
-  const sessionCookieHeader = (token: string): string =>
-    `${SESSION_COOKIE}=${token}; ${cookieAttrs(resolved.sessionMaxAge)}`;
+  const sessionCookieHeader = (token: string, req?: Request): string =>
+    `${SESSION_COOKIE}=${token}; ${cookieAttrs(resolved.sessionMaxAge, req)}`;
 
-  const clearSessionCookieHeader = (): string => `${SESSION_COOKIE}=; ${cookieAttrs(0)}`;
+  const clearSessionCookieHeader = (req?: Request): string =>
+    `${SESSION_COOKIE}=; ${cookieAttrs(0, req)}`;
 
   const withSetCookie = (res: Response, value: string): Response => {
     res.headers.append("Set-Cookie", value);
@@ -291,7 +304,7 @@ export function defineAuth(config: AuthConfig): Auth {
       ? new URL(resolved.successRedirect, extra.baseUrl).toString()
       : resolved.successRedirect;
     const res = new Response(null, { status: 302, headers: { Location: location } });
-    return withSetCookie(res, sessionCookieHeader(token));
+    return withSetCookie(res, sessionCookieHeader(token, req));
   };
 
   const notFound = (): Response => new Response("Not found", { status: 404 });
@@ -300,6 +313,7 @@ export function defineAuth(config: AuthConfig): Auth {
   const handleOAuthSignIn = async (
     provider: OAuth2ProviderConfig,
     baseUrl: string,
+    req: Request,
   ): Promise<Response> => {
     const stateToken = createSessionToken();
     const state = await hash(stateToken);
@@ -308,10 +322,13 @@ export function defineAuth(config: AuthConfig): Auth {
       status: 302,
       headers: { Location: buildAuthorizationUrl(provider, baseUrl, state, pkce.challenge) },
     });
-    withSetCookie(res, `${OAUTH_STATE_COOKIE}=${stateToken}; ${cookieAttrs(OAUTH_STATE_MAX_AGE)}`);
+    withSetCookie(
+      res,
+      `${OAUTH_STATE_COOKIE}=${stateToken}; ${cookieAttrs(OAUTH_STATE_MAX_AGE, req)}`,
+    );
     return withSetCookie(
       res,
-      `${OAUTH_PKCE_COOKIE}=${pkce.verifier}; ${cookieAttrs(OAUTH_STATE_MAX_AGE)}`,
+      `${OAUTH_PKCE_COOKIE}=${pkce.verifier}; ${cookieAttrs(OAUTH_STATE_MAX_AGE, req)}`,
     );
   };
 
@@ -527,7 +544,7 @@ export function defineAuth(config: AuthConfig): Auth {
       status: 302,
       headers: { Location: resolved.signOutRedirect },
     });
-    return withSetCookie(res, clearSessionCookieHeader());
+    return withSetCookie(res, clearSessionCookieHeader(req));
   };
 
   const handleRequest = async (
@@ -544,7 +561,7 @@ export function defineAuth(config: AuthConfig): Auth {
       if (provider.type === "credentials") {
         return handleCredentialsSignIn(provider, req);
       }
-      return handleOAuthSignIn(provider, baseUrl);
+      return handleOAuthSignIn(provider, baseUrl, req);
     }
     if (action === "callback" && provider?.type === "oauth") {
       if (req.method !== "GET") return methodNotAllowed();
@@ -593,7 +610,7 @@ export function defineAuth(config: AuthConfig): Auth {
       // optional form (no req) is kept for programmatic/offline flows.
       ...requestAuditContext(req),
     });
-    return withSetCookie(res, sessionCookieHeader(token));
+    return withSetCookie(res, sessionCookieHeader(token, req));
   };
 
   const clearSessionCookie = async (res: Response, req?: Request): Promise<Response> => {
@@ -608,7 +625,7 @@ export function defineAuth(config: AuthConfig): Auth {
         sessionHash,
       });
     }
-    return withSetCookie(res, clearSessionCookieHeader());
+    return withSetCookie(res, clearSessionCookieHeader(req));
   };
 
   return {
