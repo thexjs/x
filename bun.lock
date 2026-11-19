@@ -150,7 +150,7 @@
     },
     "packages/auth": {
       "name": "@thexjs/auth",
-      "version": "3.0.13",
+      "version": "3.1.0",
       "devDependencies": {
         "@thexjs/core": "^1.11.1",
         "tsup": "^9.0.0",
