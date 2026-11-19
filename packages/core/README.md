@@ -120,17 +120,36 @@ export const actions = {
 
 ## Islands (selective hydration)
 
-Wrap any interactive piece of a static/server-rendered page in `<Island>` to ship it as a separately-hydrated client bundle:
+Wrap any interactive piece of a static/server-rendered page in `<Island>` to ship it as a separately-hydrated client bundle, and export an `islands` map from the same route (or layout) file so the client knows what to hydrate each `data-island` marker with:
 
 ```tsx
 import { Island } from "@thexjs/core";
+import LikeButton from "../components/like-button";
 
-<Island name="LikeButton" client="visible">
-  <LikeButton />
-</Island>;
+export const islands = { LikeButton };
+
+export default function Page() {
+  return (
+    <Island name="LikeButton" client="visible">
+      <LikeButton />
+    </Island>
+  );
+}
 ```
 
 `client` accepts `"idle" | "visible" | "load"`, controlling when the island hydrates on the client. Everything outside an `<Island>` stays static/server-rendered HTML with no client JS shipped.
+
+An island's hydrated copy never receives props from the server render (`hydrateRoot(el, React.createElement(Component))` — no props, ever) — SSR and hydration both construct the component fresh. If an island needs personalized/dynamic data, either fetch it client-side inside the island itself, or keep that data out of the island and render it from a loader directly on the page instead.
+
+### Path-backed islands
+
+An `islands` entry can be a module specifier string instead of a live component reference:
+
+```tsx
+export const islands = { LikeButton: "../components/like-button" };
+```
+
+When declared this way, the client bundle imports that file **directly**, instead of re-importing the whole route module to read `Route.islands.LikeButton`. This matters when the route also exports a server-only `loader`: without a path-backed entry, resolving a co-located island at hydration time requires evaluating the entire route module — loader included — which can leak server-only imports (a database client, an auth package touching `node:crypto`, etc.) into the browser bundle. A path-backed island never imports the route file at all, so there's nothing to leak. Prefer this form whenever an island's component already lives in its own file, which is the common case.
 
 ## Content collections (Markdown)
 

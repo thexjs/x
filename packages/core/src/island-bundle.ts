@@ -1,5 +1,5 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import {
   assertNoEnvLeakage,
   assertNoEnvValueLeakage,
@@ -47,23 +47,77 @@ export function actionsRewritePlugin(
   };
 }
 
-export function generateHydrateEntry(routeAbsPath: string, layoutAbsPaths: string[] = []): string {
-  const layoutImports = layoutAbsPaths
-    .map((p, i) => `import * as Layout${i} from "${p}";`)
+/**
+ * Builds the client hydration entry for a route.
+ *
+ * `islandNames`/`islandPaths` are optional and, when omitted, preserve the
+ * original behavior exactly: always `import * as Route from routeAbsPath`
+ * (and each layout) and resolve `Route.islands?.[name]` at runtime.
+ *
+ * When `islandPaths` has an entry for one of `islandNames` (a route or
+ * layout's `islands` map had a *string* value for that name -- a module
+ * specifier, not a live component reference), that island is resolved via a
+ * direct static import of that path instead. If every requested name is
+ * path-backed this way, the route file (and its layouts) are never imported
+ * into the browser bundle at all -- which is the point: a route combining a
+ * server-only `loader` with `islands` in the same file used to leak that
+ * loader's imports (e.g. a database/auth client touching `node:crypto`) into
+ * the client bundle, because reading `Route.islands?.[name]` required
+ * evaluating the whole module, loader included. See `resolveIslandPaths`,
+ * which is what actually discovers these string-valued entries server-side
+ * before this function is called.
+ */
+export function generateHydrateEntry(
+  routeAbsPath: string,
+  layoutAbsPaths: string[] = [],
+  islandNames?: string[],
+  islandPaths: Record<string, string> = {},
+): string {
+  // No island-name list provided: caller is using the original contract
+  // (always import the route module). Keeps every pre-existing call site
+  // and test byte-for-byte compatible.
+  const pathBackedNames =
+    islandNames === undefined ? [] : islandNames.filter((n) => islandPaths[n] !== undefined);
+  const moduleBackedNames =
+    islandNames === undefined
+      ? undefined // signals "unconditionally import Route", not "import nothing"
+      : islandNames.filter((n) => islandPaths[n] === undefined);
+  const needsRouteModule = moduleBackedNames === undefined || moduleBackedNames.length > 0;
+
+  const routeImport = needsRouteModule ? `import * as Route from "${routeAbsPath}";\n` : "";
+  const layoutImports = needsRouteModule
+    ? layoutAbsPaths.map((p, i) => `import * as Layout${i} from "${p}";`).join("\n")
+    : "";
+  const pathImports = pathBackedNames
+    .map((name, i) => `import __x_island_${i} from "${islandPaths[name]}";`)
     .join("\n");
-  const lookupParts = ["Route.islands?.[name]"];
-  for (let i = 0; i < layoutAbsPaths.length; i++) {
-    lookupParts.push(`Layout${i}.islands?.[name]`);
+  const pathEntries = pathBackedNames
+    .map((name, i) => `  ${JSON.stringify(name)}: __x_island_${i},`)
+    .join("\n");
+
+  const moduleLookupParts: string[] = [];
+  if (needsRouteModule) {
+    moduleLookupParts.push("Route.islands?.[name]");
+    for (let i = 0; i < layoutAbsPaths.length; i++) {
+      moduleLookupParts.push(`Layout${i}.islands?.[name]`);
+    }
   }
-  const lookup = lookupParts.join(" ?? ");
+  const moduleLookup = moduleLookupParts.length > 0 ? moduleLookupParts.join(" ?? ") : "undefined";
 
   return `import React from "react";
 import { hydrateRoot } from "react-dom/client";
-import * as Route from "${routeAbsPath}";
-${layoutImports}
+${routeImport}${layoutImports}
+${pathImports}
+
+var __x_pathIslands = {
+${pathEntries}
+};
 
 function resolveIsland(name: string) {
-  return ${lookup};
+  if (Object.prototype.hasOwnProperty.call(__x_pathIslands, name)) {
+    return __x_pathIslands[name];
+  }
+  return ${moduleLookup};
 }
 
 // Islands whose render is non-deterministic (e.g. \`useState(() => ...)\` with
@@ -140,6 +194,57 @@ export function wrapIslandBundle(code: string): string {
 }
 
 /**
+ * Discovers, for the given route (and its layout chain), which of
+ * `islandNames` were declared with a *string* value in that module's
+ * `islands` map rather than a live component reference -- e.g.
+ * `export const islands = { Foo: "../../components/foo" }`. A string value
+ * is a module specifier, resolved here relative to the directory of the
+ * file that declared it, into an absolute path the client entry can import
+ * directly.
+ *
+ * This runs the route/layout modules server-side (not through Bun.build's
+ * browser-target pipeline), so a server-only `loader` co-located in the same
+ * file evaluates completely normally here -- `node:crypto`, database
+ * clients, whatever. Nothing from that evaluation reaches the browser: only
+ * the resolved path *strings* are returned, and `generateHydrateEntry` uses
+ * them to import the island's own file directly, bypassing the route module
+ * (and its loader's imports) in the actual client bundle entirely.
+ *
+ * Best-effort: a route/layout file that fails to import here (a real syntax
+ * error, a missing required env var, etc.) is skipped rather than thrown --
+ * the caller falls back to the original `Route.islands?.[name]` resolution,
+ * which will surface the same failure through the normal Bun.build error
+ * path instead.
+ */
+export async function resolveIslandPaths(
+  routeFilePath: string,
+  layoutFilePaths: string[],
+  islandNames: string[],
+): Promise<Record<string, string>> {
+  if (islandNames.length === 0) return {};
+  const paths: Record<string, string> = {};
+  const owners = [routeFilePath, ...layoutFilePaths];
+  for (const ownerPath of owners) {
+    let mod: Record<string, unknown>;
+    try {
+      mod = (await import(ownerPath)) as Record<string, unknown>;
+    } catch {
+      continue;
+    }
+    const islands = mod.islands as Record<string, unknown> | undefined;
+    if (!islands) continue;
+    for (const name of islandNames) {
+      if (name in paths) continue; // route's own islands win over a layout's
+      const value = islands[name];
+      if (typeof value === "string") {
+        paths[name] = resolve(dirname(ownerPath), value);
+      }
+    }
+  }
+  return paths;
+}
+
+/**
  * Bundles a route's island hydration entry into browser JS entirely in
  * memory. Bun.build() requires a real entrypoint file, so a scratch entry
  * file is written to a temp directory and removed immediately after —
@@ -160,8 +265,13 @@ export async function buildIslandBundleInMemory(
   const scratchDir = mkdtempSync(join(scratchRoot, "x-islands-"));
 
   try {
+    const islandPaths = await resolveIslandPaths(routeFilePath, layoutFilePaths, islandNames);
     const entryPath = join(scratchDir, `${entryId}.tsx`);
-    writeFileSync(entryPath, generateHydrateEntry(routeFilePath, layoutFilePaths), "utf-8");
+    writeFileSync(
+      entryPath,
+      generateHydrateEntry(routeFilePath, layoutFilePaths, islandNames, islandPaths),
+      "utf-8",
+    );
 
     const result = await Bun.build({
       entrypoints: [entryPath],
@@ -222,7 +332,13 @@ export async function bundleRouteIslandsToDisk(
   mkdirSync(outdir, { recursive: true });
   const bundlePath = join(outdir, `${entryId}.js`);
 
-  const hydrateEntry = generateHydrateEntry(routeFilePath, layoutFilePaths);
+  const islandPaths = await resolveIslandPaths(routeFilePath, layoutFilePaths, islandNames);
+  const hydrateEntry = generateHydrateEntry(
+    routeFilePath,
+    layoutFilePaths,
+    islandNames,
+    islandPaths,
+  );
   const entryPath = join(outdir, `${entryId}.tsx`);
   writeFileSync(entryPath, hydrateEntry, "utf-8");
 
