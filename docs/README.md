@@ -344,8 +344,13 @@ releases. Pin exact versions if stability matters to you.
 
 - **Unstable API**: everything above is subject to change. Treat pre-1.0 packages
   (and any untagged minor in 1.x/3.x) as potentially breaking.
-- **Bun-only**: the framework runs on Bun (runtime, bundler, package manager).
-  There is no Node.js target.
+- **Bun-only to develop and build**: the toolchain (bundler, package manager,
+  `x dev`/`x build`) runs on Bun; there's no Node.js path for building an app.
+  The _deployed_ output is more flexible: `x build --adapter node`
+  (`@thexjs/adapter-node`) produces a standalone server with no Bun
+  dependency at runtime, for hosts that only give you Node (Railway, Render,
+  a bare VPS). See [DEPLOY.md](../DEPLOY.md) for the full set of deployment
+  targets (Bun process, Docker, Vercel, Node, Fly.io).
 - **Content collections** and the **data layer** (SQLite/Postgres migrations)
   work but have the least test coverage in the framework; the image proxy and
   server-actions runtime are covered, the build toolchain is exercised via the
