@@ -616,6 +616,46 @@ describe.if(Boolean(PG_TEST_URL))("runPostgresMigrations", () => {
     });
   });
 
+  test("a later step's failure does not undo an earlier step already rolled back in the same call", async () => {
+    resetFixtures();
+    writeMigration("001_create_users.sql", "CREATE TABLE users (id SERIAL PRIMARY KEY);");
+    writeMigration("001_create_users.down.sql", "DROP TABLE users;");
+    writeMigration(
+      "002_add_profiles.sql",
+      "CREATE TABLE profiles (id SERIAL PRIMARY KEY, user_id INTEGER);",
+    );
+    // Deliberately invalid SQL -- this down migration always fails.
+    writeMigration("002_add_profiles.down.sql", "THIS IS NOT VALID SQL;");
+    writeMigration(
+      "003_add_settings.sql",
+      "CREATE TABLE settings (id SERIAL PRIMARY KEY, profile_id INTEGER);",
+    );
+    writeMigration("003_add_settings.down.sql", "DROP TABLE settings;");
+
+    await withDatabase(async (client) => {
+      await runPostgresMigrations(client, FIXTURE_DIR);
+
+      // Rollback walks newest-applied-first: 003 (succeeds), then 002 (its
+      // down script throws) -- 001 is never even attempted, since rollback
+      // stops at the first failure.
+      await expect(rollbackPostgresMigrations(client, FIXTURE_DIR, 3)).rejects.toThrow();
+
+      // 003 must stay reverted -- that's the actual bug this guards against.
+      // The original code threw directly inside client.begin()'s callback,
+      // which aborts the WHOLE wrapping transaction on 002's failure,
+      // silently undoing 003's already-committed (via RELEASE SAVEPOINT)
+      // rollback too, contradicting this function's own documented
+      // guarantee ("a failed down script doesn't lose progress already
+      // made").
+      expect(await tableExists(client, "settings")).toBe(false);
+      // 002's down script threw, so 002 itself must still be applied.
+      expect(await tableExists(client, "profiles")).toBe(true);
+      // 001 was never reached.
+      expect(await tableExists(client, "users")).toBe(true);
+      expect(await appliedNames(client)).toEqual(["001_create_users.sql", "002_add_profiles.sql"]);
+    });
+  });
+
   test("stops at a migration with no down file instead of silently skipping it", async () => {
     resetFixtures();
     writeMigration("001_create_users.sql", "CREATE TABLE users (id SERIAL PRIMARY KEY);");
