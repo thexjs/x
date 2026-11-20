@@ -215,10 +215,12 @@ jobs:
   bench:
     name: Load test (SLO-gated)
     runs-on: ubuntu-latest
-    # Gates the merge: a run that violates an SLO, produces server errors, or
-    # breaks the rate limiter fails the build. Thresholds live in
-    # scripts/bench/slo.ts and BENCHMARKS.md; they are loose enough for shared
-    # runners while still catching real (3-10x) regressions.
+    # Gates the merge: a run that violates an SLO, produces server errors,
+    # breaks the rate limiter, or fails the crash-recovery scenario (#129 —
+    # kill -9 the server, restart it, assert traffic resumes within a bound)
+    # fails the build. Thresholds live in scripts/bench/slo.ts and
+    # BENCHMARKS.md; they are loose enough for shared runners while still
+    # catching real (3-10x) regressions.
     steps:
       - uses: actions/checkout@v7
         with:
