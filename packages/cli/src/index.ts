@@ -16,14 +16,21 @@ import { xError, xInfo, xSuccess, xWarn } from "./terminal.js";
 // (common muscle memory from `npm run` / `bun run`).
 function parseArgv(argv: string[]): {
   command: string | undefined;
+  args: string[];
   cwd: string | undefined;
   adapter: string | undefined;
   outDir: string | undefined;
+  migrateDir: string | undefined;
+  migrateSqlite: string | undefined;
+  migratePostgres: boolean;
 } {
   const rest: string[] = [];
   let cwd: string | undefined;
   let adapter: string | undefined;
   let outDir: string | undefined;
+  let migrateDir: string | undefined;
+  let migrateSqlite: string | undefined;
+  let migratePostgres = false;
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i] as string;
@@ -71,17 +78,75 @@ function parseArgv(argv: string[]): {
       outDir = value;
       continue;
     }
+    if (arg === "--dir") {
+      const next = argv[++i];
+      if (!next || next.startsWith("--")) {
+        xError('"--dir" requires a path, e.g. "--dir src/lib/migrations"');
+        process.exit(1);
+      }
+      migrateDir = next;
+      continue;
+    }
+    if (arg.startsWith("--dir=")) {
+      const value = arg.slice("--dir=".length);
+      if (!value) {
+        xError('"--dir=" requires a path, e.g. "--dir=src/lib/migrations"');
+        process.exit(1);
+      }
+      migrateDir = value;
+      continue;
+    }
+    if (arg === "--sqlite") {
+      const next = argv[++i];
+      if (!next || next.startsWith("--")) {
+        xError('"--sqlite" requires a path, e.g. "--sqlite data/dev.db"');
+        process.exit(1);
+      }
+      migrateSqlite = next;
+      continue;
+    }
+    if (arg.startsWith("--sqlite=")) {
+      const value = arg.slice("--sqlite=".length);
+      if (!value) {
+        xError('"--sqlite=" requires a path, e.g. "--sqlite=data/dev.db"');
+        process.exit(1);
+      }
+      migrateSqlite = value;
+      continue;
+    }
+    if (arg === "--postgres") {
+      migratePostgres = true;
+      continue;
+    }
     rest.push(arg);
   }
 
   if (rest[0] === "run") rest.shift();
 
-  return { command: rest[0], cwd, adapter, outDir };
+  return {
+    command: rest[0],
+    args: rest,
+    cwd,
+    adapter,
+    outDir,
+    migrateDir,
+    migrateSqlite,
+    migratePostgres,
+  };
 }
 
 export { compileTailwindAsync } from "./tailwind.js";
 
-const { command, cwd, adapter, outDir: outDirFlag } = parseArgv(Bun.argv.slice(2));
+const {
+  command,
+  args,
+  cwd,
+  adapter,
+  outDir: outDirFlag,
+  migrateDir: migrateDirFlag,
+  migrateSqlite: migrateSqliteFlag,
+  migratePostgres: migratePostgresFlag,
+} = parseArgv(Bun.argv.slice(2));
 const projectDir = cwd ? resolve(process.cwd(), cwd) : process.cwd();
 
 async function detectOptions(): Promise<{ options: DetectedOptions; configPath: string | null }> {
@@ -339,6 +404,77 @@ async function serveStaticBuild(clientDir: string): Promise<void> {
   });
 }
 
+/**
+ * `x migrate down [N]`: rolls back N applied migrations (default 1) by
+ * running each one's `*.down.sql` sibling and removing its bookkeeping row.
+ * Backend selection mirrors `connectPostgres`'s own default: use Postgres
+ * when `--postgres` is passed or `DATABASE_URL` is set (unless `--sqlite`
+ * explicitly asks for SQLite instead); otherwise SQLite.
+ */
+async function cmdMigrateDown(stepsArg: string | undefined): Promise<void> {
+  let steps = 1;
+  if (stepsArg !== undefined) {
+    steps = Number(stepsArg);
+    if (!Number.isInteger(steps) || steps <= 0) {
+      xError(`invalid step count "${stepsArg}" -- expected a positive integer`);
+      process.exit(1);
+    }
+  }
+
+  const dir = resolve(projectDir, migrateDirFlag ?? "src/lib/migrations");
+  if (!existsSync(dir)) {
+    xError(`no migrations directory found at ${relative(projectDir, dir)}`);
+    xError('pass "--dir <path>" to point at your migrations directory');
+    process.exit(1);
+  }
+
+  const usePostgres =
+    migratePostgresFlag || (!migrateSqliteFlag && Boolean(process.env.DATABASE_URL));
+
+  const dataPath = Bun.resolveSync("@thexjs/core/data", projectDir);
+
+  if (usePostgres) {
+    const { connectPostgres, rollbackPostgresMigrations } = (await import(dataPath)) as {
+      connectPostgres: typeof import("@thexjs/core/data").connectPostgres;
+      rollbackPostgresMigrations: typeof import("@thexjs/core/data").rollbackPostgresMigrations;
+    };
+    const client = connectPostgres();
+    try {
+      const result = await rollbackPostgresMigrations(client, dir, steps);
+      reportRollback(result);
+    } finally {
+      (client as unknown as { close?(): void }).close?.();
+    }
+    return;
+  }
+
+  const { connectSQLite, rollbackSQLiteMigrations } = (await import(dataPath)) as {
+    connectSQLite: typeof import("@thexjs/core/data").connectSQLite;
+    rollbackSQLiteMigrations: typeof import("@thexjs/core/data").rollbackSQLiteMigrations;
+  };
+  const sqlitePath = resolve(projectDir, migrateSqliteFlag ?? "data/dev.db");
+  if (!existsSync(sqlitePath)) {
+    xError(`no SQLite database found at ${relative(projectDir, sqlitePath)}`);
+    xError('pass "--sqlite <path>" to point at your database file');
+    process.exit(1);
+  }
+  const db = connectSQLite({ path: sqlitePath });
+  const result = rollbackSQLiteMigrations(db, dir, steps);
+  reportRollback(result);
+}
+
+function reportRollback(result: { rolledBack: string[]; skipped: string[] }): void {
+  if (result.rolledBack.length === 0 && result.skipped.length === 0) {
+    xInfo("nothing to roll back");
+    return;
+  }
+  for (const name of result.rolledBack) xSuccess(`rolled back: ${name}`);
+  for (const name of result.skipped) {
+    xWarn(`no down migration for "${name}" -- stopped rollback here`);
+  }
+  if (result.skipped.length > 0) process.exitCode = 1;
+}
+
 function printVersion(): void {
   try {
     const pkgPath = join(import.meta.dir, "..", "package.json");
@@ -356,21 +492,27 @@ Usage:
   x <command> [options]
 
 Commands:
-  dev     Start the development server with hot reload
-  build   Build for production (static export + server bundle -> .x/)
-  start   Start the production server (run "x build" first)
-  doctor  Diagnose the project: config, dirs, env isolation, dependency health
+  dev            Start the development server with hot reload
+  build          Build for production (static export + server bundle -> .x/)
+  start          Start the production server (run "x build" first)
+  doctor         Diagnose the project: config, dirs, env isolation, dependency health
+  migrate down [N]  Roll back N applied migrations (default 1), most-recently-applied first
 
 Options:
   --cwd <dir>          Run as if started inside <dir> (default: current directory)
   --adapter <name>     "build" target adapter, e.g. "vercel" (default: Bun server -> .x/)
   --outDir <dir>       Output directory for "build"/"start" (default: .x)
+  --dir <path>         Migrations directory for "migrate down" (default: src/lib/migrations)
+  --sqlite <path>      SQLite database file for "migrate down" (default: data/dev.db)
+  --postgres           Use Postgres for "migrate down" (reads DATABASE_URL)
   -h, --help           Show this help message
   -v, --version        Print the CLI version
 
 Tip: "x run dev" also works, as an alias for "x dev".
 Tip: "x build --adapter vercel" emits a .vercel/output tree (Build Output API v3),
-     no vercel.json needed. Requires @thexjs/adapter-vercel as a dependency.`);
+     no vercel.json needed. Requires @thexjs/adapter-vercel as a dependency.
+Tip: "x migrate down" rolls back SQLite by default, or Postgres automatically
+     when DATABASE_URL is set (or pass --postgres explicitly).`);
 }
 
 async function main(): Promise<void> {
@@ -406,6 +548,17 @@ async function main(): Promise<void> {
     case "doctor":
       process.exitCode = await runDoctor(projectDir);
       break;
+    case "migrate": {
+      const sub = args[1];
+      if (sub === "down") {
+        await cmdMigrateDown(args[2]);
+      } else {
+        xError(`unknown "migrate" subcommand "${sub ?? ""}"`);
+        xError("usage: x migrate down [N]");
+        process.exit(1);
+      }
+      break;
+    }
     case "--help":
     case "-h":
     case undefined:

@@ -192,6 +192,25 @@ const sql = connectPostgres({ url: process.env.DATABASE_URL! });
 await runPostgresMigrations(sql, "./data/migrations");
 ```
 
+### Rolling back migrations
+
+Each up-migration file (e.g. `001_create_users.sql`) can have an optional `.down.sql` sibling in the same directory (`001_create_users.down.sql`) that reverts it. This is additive: existing migrations with no down file keep working exactly as before, they just can't be rolled back.
+
+```ts
+import { rollbackSQLiteMigrations, rollbackPostgresMigrations } from "@thexjs/core/data";
+
+// Rolls back the most recently applied migration (default: 1 step).
+await rollbackSQLiteMigrations(db, "./data/migrations");
+await rollbackPostgresMigrations(sql, "./data/migrations");
+
+// Roll back the last 3.
+await rollbackSQLiteMigrations(db, "./data/migrations", 3);
+```
+
+Rollback runs most-recently-applied-first and stops the first time it hits a migration with no `.down.sql` file — rather than silently skipping it — since an older migration's down script may assume the newer schema is still in place. The result tells you what happened: `{ rolledBack: string[], skipped: string[] }` (`skipped` has at most one entry, the migration rollback stopped at).
+
+From the CLI: `x migrate down [N]` (see `@thexjs/cli`).
+
 ## Middleware
 
 ```ts

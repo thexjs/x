@@ -1,3 +1,4 @@
+import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
 import { appendFileSync, chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -461,6 +462,144 @@ export const islands = { Like: Like };
       rmSync(prodDir, { recursive: true, force: true });
     }
   }, 30_000);
+
+  test("migrate down rolls back the most recently applied SQLite migration", () => {
+    const dir = join(FIXTURE_DIR, "migrate-down");
+    mkdirSync(join(dir, "src/lib/migrations"), { recursive: true });
+    mkdirSync(join(dir, "data"), { recursive: true });
+    writeFileSync(join(dir, "x.config.ts"), 'export default { pagesDir: "src/pages" };\n');
+    writeFileSync(
+      join(dir, "src/lib/migrations/001_create_users.sql"),
+      "CREATE TABLE users (id INTEGER PRIMARY KEY);",
+    );
+    writeFileSync(join(dir, "src/lib/migrations/001_create_users.down.sql"), "DROP TABLE users;");
+
+    // Apply the migration directly (bypassing the CLI) so "migrate down" has
+    // something real to revert.
+    const dbPath = join(dir, "data/dev.db");
+    const db = new Database(dbPath);
+    db.run(`CREATE TABLE _x_migrations (
+      name TEXT PRIMARY KEY,
+      applied_at TEXT DEFAULT (datetime('now')),
+      checksum TEXT
+    )`);
+    db.run("CREATE TABLE users (id INTEGER PRIMARY KEY);");
+    db.run("INSERT INTO _x_migrations (name) VALUES ('001_create_users.sql')");
+    db.close();
+
+    const res = runCli(["migrate", "down", "--cwd", dir]);
+    expect(res.status).toBe(0);
+    expect(res.stdout + res.stderr).toContain("rolled back: 001_create_users.sql");
+
+    const verify = new Database(dbPath);
+    const tables = verify
+      .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'")
+      .get();
+    expect(tables).toBeNull();
+    const rows = verify.query("SELECT name FROM _x_migrations").all();
+    expect(rows).toEqual([]);
+    verify.close();
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("migrate down stops (non-zero exit) when a migration has no down file", () => {
+    const dir = join(FIXTURE_DIR, "migrate-down-no-op");
+    mkdirSync(join(dir, "src/lib/migrations"), { recursive: true });
+    mkdirSync(join(dir, "data"), { recursive: true });
+    writeFileSync(join(dir, "x.config.ts"), 'export default { pagesDir: "src/pages" };\n');
+    writeFileSync(
+      join(dir, "src/lib/migrations/001_create_users.sql"),
+      "CREATE TABLE users (id INTEGER PRIMARY KEY);",
+    );
+    // Deliberately no "001_create_users.down.sql".
+
+    const dbPath = join(dir, "data/dev.db");
+    const db = new Database(dbPath);
+    db.run(`CREATE TABLE _x_migrations (
+      name TEXT PRIMARY KEY,
+      applied_at TEXT DEFAULT (datetime('now')),
+      checksum TEXT
+    )`);
+    db.run("CREATE TABLE users (id INTEGER PRIMARY KEY);");
+    db.run("INSERT INTO _x_migrations (name) VALUES ('001_create_users.sql')");
+    db.close();
+
+    const res = runCli(["migrate", "down", "--cwd", dir]);
+    expect(res.status).not.toBe(0);
+    expect(res.stdout + res.stderr).toContain("no down migration");
+
+    const verify = new Database(dbPath);
+    const tables = verify
+      .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'users'")
+      .get();
+    // Nothing reverted: the migration stays applied since it can't be undone.
+    expect(tables).not.toBeNull();
+    verify.close();
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("migrate down supports rolling back multiple steps and a custom --dir", () => {
+    const dir = join(FIXTURE_DIR, "migrate-down-steps");
+    mkdirSync(join(dir, "migrations"), { recursive: true });
+    mkdirSync(join(dir, "data"), { recursive: true });
+    writeFileSync(join(dir, "x.config.ts"), 'export default { pagesDir: "src/pages" };\n');
+    writeFileSync(
+      join(dir, "migrations/001_create_users.sql"),
+      "CREATE TABLE users (id INTEGER PRIMARY KEY);",
+    );
+    writeFileSync(join(dir, "migrations/001_create_users.down.sql"), "DROP TABLE users;");
+    writeFileSync(
+      join(dir, "migrations/002_add_profiles.sql"),
+      "CREATE TABLE profiles (id INTEGER PRIMARY KEY);",
+    );
+    writeFileSync(join(dir, "migrations/002_add_profiles.down.sql"), "DROP TABLE profiles;");
+
+    const dbPath = join(dir, "data/dev.db");
+    const db = new Database(dbPath);
+    db.run(`CREATE TABLE _x_migrations (
+      name TEXT PRIMARY KEY,
+      applied_at TEXT DEFAULT (datetime('now')),
+      checksum TEXT
+    )`);
+    db.run("CREATE TABLE users (id INTEGER PRIMARY KEY);");
+    db.run("CREATE TABLE profiles (id INTEGER PRIMARY KEY);");
+    db.run("INSERT INTO _x_migrations (name) VALUES ('001_create_users.sql')");
+    db.run("INSERT INTO _x_migrations (name) VALUES ('002_add_profiles.sql')");
+    db.close();
+
+    const res = runCli(["migrate", "down", "2", "--cwd", dir, "--dir", "migrations"]);
+    expect(res.status).toBe(0);
+    const out = res.stdout + res.stderr;
+    expect(out).toContain("rolled back: 002_add_profiles.sql");
+    expect(out).toContain("rolled back: 001_create_users.sql");
+
+    const verify = new Database(dbPath);
+    const rows = verify.query("SELECT name FROM _x_migrations").all();
+    expect(rows).toEqual([]);
+    verify.close();
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("migrate down fails clearly with an invalid step count", () => {
+    const dir = join(FIXTURE_DIR, "migrate-down-invalid");
+    mkdirSync(join(dir, "src/lib/migrations"), { recursive: true });
+    writeFileSync(join(dir, "x.config.ts"), 'export default { pagesDir: "src/pages" };\n');
+
+    const res = runCli(["migrate", "down", "not-a-number", "--cwd", dir]);
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain("invalid step count");
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("migrate with an unknown subcommand fails clearly", () => {
+    const res = runCli(["migrate", "sideways", "--cwd", FIXTURE_DIR]);
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain('unknown "migrate" subcommand "sideways"');
+  });
 
   test("x start shows a friendly error when bun is not on PATH (#180)", async () => {
     const noBun = join(FIXTURE_DIR, "no-bun-start");
