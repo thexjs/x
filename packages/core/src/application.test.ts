@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createApp } from "./application";
 import type { BackpressureOptions } from "./backpressure";
+import { routePatternToRegex } from "./router";
 
 const WORK_URL = "http://localhost/api/work";
 
@@ -26,6 +27,7 @@ async function appWithHandler(
             routePath: "/api/work",
             paramNames: [],
             isApi: true,
+            matcher: routePatternToRegex("/api/work"),
           },
           mode: "server",
           module: { GET: handler },

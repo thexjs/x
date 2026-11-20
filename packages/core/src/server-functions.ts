@@ -2,7 +2,7 @@ import { writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { reportException } from "./observability/monitoring";
 import { tracePhase } from "./observability/tracing";
-import { routePatternToRegex } from "./router";
+import { extractParams, routePatternToRegex } from "./router";
 import { RequestBodyTooLargeError } from "./security/body-size";
 import { type CsrfOptions, checkCsrf } from "./security/csrf";
 
@@ -49,6 +49,13 @@ interface ActionEntry {
   routePath: string;
   paramNames: string[];
   fns: Map<string, (...args: unknown[]) => Promise<unknown>>;
+  /**
+   * The route pattern compiled to a `RegExp` once, when the entry is first
+   * registered — reused for every action lookup against this route instead
+   * of being rebuilt per request (see router.ts's `RouteEntry.matcher` for
+   * the same precompilation on the page/API routing path, #161).
+   */
+  matcher: RegExp;
 }
 
 const ACTION_ROUTES: ActionEntry[] = [];
@@ -69,7 +76,12 @@ export function registerServerFunctions(
       existing.fns.set(name, fn);
     }
   } else {
-    ACTION_ROUTES.push({ routePath, paramNames, fns: fnMap });
+    ACTION_ROUTES.push({
+      routePath,
+      paramNames,
+      fns: fnMap,
+      matcher: routePatternToRegex(routePath),
+    });
   }
 }
 
@@ -77,13 +89,16 @@ export function registerServerFunctions(
  * Snapshot of the action registry for one request. Returns a copy so a
  * concurrent dev rebuild (which mutates `ACTION_ROUTES` in place) can never
  * change the set of routes an in-flight request sees — no half-populated
- * registry, no cross-request coupling.
+ * registry, no cross-request coupling. The precompiled `matcher` is carried
+ * over by reference (not rebuilt) since it is immutable once an entry is
+ * registered.
  */
 function snapshotActionRoutes(): ActionEntry[] {
   return ACTION_ROUTES.map((entry) => ({
     routePath: entry.routePath,
     paramNames: entry.paramNames,
     fns: new Map(entry.fns),
+    matcher: entry.matcher,
   })).sort(compareActionRoutes);
 }
 
@@ -142,7 +157,7 @@ export function getServerFunctionHandler(
     const concretePath = `/${parts.join("/")}`;
 
     for (const entry of snapshotActionRoutes()) {
-      const params = extractActionParams(entry.routePath, entry.paramNames, concretePath);
+      const params = extractParams(entry.matcher, entry.paramNames, concretePath);
       if (params === null) continue;
 
       const fn = entry.fns.get(actionName);
@@ -186,33 +201,4 @@ export function getServerFunctionHandler(
 
     return new Response("Not found", { status: 404 });
   };
-}
-
-function extractActionParams(
-  routePath: string,
-  paramNames: string[],
-  url: string,
-): Record<string, string> | null {
-  const regex = routePatternToRegex(routePath);
-  const match = url.match(regex);
-  if (!match) return null;
-
-  const params: Record<string, string> = {};
-  let idx = 1;
-  for (const name of paramNames) {
-    const value = match[idx];
-    if (value !== undefined) {
-      params[name] = safeDecodeURIComponent(value);
-    }
-    idx++;
-  }
-  return params;
-}
-
-function safeDecodeURIComponent(value: string): string {
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
 }

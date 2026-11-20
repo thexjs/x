@@ -551,7 +551,7 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
     return async (req: Request) => {
       try {
         const params =
-          extractParams(route.routePath, route.paramNames, new URL(req.url).pathname) ?? {};
+          extractParams(route.matcher, route.paramNames, new URL(req.url).pathname) ?? {};
 
         const baseHandler = async (ctx: { params: Record<string, string>; request: Request }) => {
           // Cache key is the full URL (pathname + search): two ISR pages that
@@ -1222,7 +1222,7 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
       if (proxiedImage !== null) return proxiedImage;
 
       for (const h of handlers) {
-        const params = extractParams(h.entry.routePath, h.entry.paramNames, url);
+        const params = extractParams(h.entry.matcher, h.entry.paramNames, url);
         if (params !== null) {
           return h.handler(req);
         }
