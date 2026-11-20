@@ -8,6 +8,8 @@ import { createIslandRegistry, Island, IslandProvider } from "./island";
 import {
   buildIslandBundleInMemory,
   generateHydrateEntry,
+  hashId,
+  islandEntryId,
   resolveIslandPaths,
 } from "./island-bundle";
 
@@ -256,6 +258,35 @@ describe("island root unmount on client-nav (#158)", () => {
     await tick();
     expect(window.__xTestCleanupCount).toBe(2);
     expect(window.__xIslandRoots?.length).toBe(0);
+  });
+});
+
+describe("islandEntryId / hashId (#156 collision regression)", () => {
+  test("two routes sharing a basename in different directories get different entry ids", () => {
+    const a = islandEntryId("/project/src/pages/a/index.tsx");
+    const b = islandEntryId("/project/src/pages/b/index.tsx");
+    expect(a).not.toBe(b);
+  });
+
+  test("hashId produces a wider, fixed-length hex digest", () => {
+    const hash = hashId("/project/src/pages/a/index.tsx");
+    // 64-bit hash truncated to 16 hex chars -- wide enough to make the
+    // basename-collision scenario above astronomically unlikely at any
+    // realistic route count, unlike the old 32-bit rolling hash.
+    expect(hash).toMatch(/^[0-9a-f]{16}$/);
+  });
+
+  test("hashId is deterministic for the same input", () => {
+    const path = "/project/src/pages/nested/index.tsx";
+    expect(hashId(path)).toBe(hashId(path));
+  });
+
+  test("different paths produce different hashes across a larger sample (no collisions)", () => {
+    const hashes = new Set<string>();
+    for (let i = 0; i < 500; i++) {
+      hashes.add(hashId(`/project/src/pages/dir-${i}/index.tsx`));
+    }
+    expect(hashes.size).toBe(500);
   });
 });
 
