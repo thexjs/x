@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 import type { ScenarioResult } from "./slo";
-import { DEFAULT_SLOS, evaluateSlo, formatViolations } from "./slo";
+import {
+  DEFAULT_MAX_RESTART_MS,
+  DEFAULT_SLOS,
+  evaluateRestartSlo,
+  evaluateSlo,
+  formatViolations,
+} from "./slo";
 
 /**
  * Scripted proof for the "a regression against an SLO causes the job to fail"
@@ -65,5 +71,44 @@ describe("evaluateSlo", () => {
     ]);
     expect(out).toContain("ssr-page");
     expect(out).toContain("900ms exceeds SLO 500ms");
+  });
+});
+
+/**
+ * Scripted proof for the crash-recovery restart-time pinned metric (#129):
+ * the same pure function the CI gate calls must flag a slow restart and pass
+ * a fast one.
+ */
+describe("evaluateRestartSlo", () => {
+  test("passes a restart well within the bound", () => {
+    const res = evaluateRestartSlo("crash-recovery", 1200, DEFAULT_MAX_RESTART_MS);
+    expect(res.passed).toBe(true);
+    expect(res.violations).toHaveLength(0);
+  });
+
+  test("fails when the restart takes longer than the bound", () => {
+    const res = evaluateRestartSlo(
+      "crash-recovery",
+      DEFAULT_MAX_RESTART_MS + 1,
+      DEFAULT_MAX_RESTART_MS,
+    );
+    expect(res.passed).toBe(false);
+    expect(res.violations).toEqual([
+      {
+        scenario: "crash-recovery",
+        kind: "restart-time",
+        actual: DEFAULT_MAX_RESTART_MS + 1,
+        limit: DEFAULT_MAX_RESTART_MS,
+        unit: "ms",
+      },
+    ]);
+  });
+
+  test("formatViolations renders a restart-time violation", () => {
+    const out = formatViolations([
+      { scenario: "crash-recovery", kind: "restart-time", actual: 6000, limit: 5000, unit: "ms" },
+    ]);
+    expect(out).toContain("crash-recovery");
+    expect(out).toContain("restart time 6000ms exceeds SLO 5000ms");
   });
 });

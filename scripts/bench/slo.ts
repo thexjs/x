@@ -33,7 +33,7 @@ export interface SloThresholds {
 
 export interface SloViolation {
   scenario: string;
-  kind: "p95" | "error-rate";
+  kind: "p95" | "error-rate" | "restart-time";
   actual: number;
   limit: number;
   unit: string;
@@ -49,6 +49,17 @@ export const DEFAULT_SLOS: SloThresholds = {
   p95Ms: 500,
   maxErrorRate: 0.001,
 };
+
+/**
+ * Pinned metric added by #129: the crash-recovery scenario (crash-recovery.ts)
+ * kill -9's the server mid-run and measures the time from that kill to the
+ * respawned process serving its first successful request. 5s is deliberately
+ * loose versus a local run (sub-second: spawn a Bun process + boot the app) to
+ * absorb a shared CI runner's scheduling noise, while still catching a real
+ * regression — e.g. something making app boot itself slow, or the respawn
+ * logic hanging.
+ */
+export const DEFAULT_MAX_RESTART_MS = 5000;
 
 /**
  * Pure SLO check, kept side-effect free so it is unit-testable as the "proof"
@@ -93,17 +104,45 @@ export function evaluateSlo(
   return { passed: violations.length === 0, violations };
 }
 
+/**
+ * Pure check for the crash-recovery restart-time pinned metric (#129). Kept
+ * side-effect free and separate from `evaluateSlo`, which checks per-scenario
+ * request latency/error-rate — restart time isn't a request latency, it's
+ * "how long the server was unreachable after a hard crash", so it gets its
+ * own violation kind instead of being shoehorned into `ScenarioResult`.
+ */
+export function evaluateRestartSlo(
+  scenario: string,
+  restartMs: number,
+  maxRestartMs: number = DEFAULT_MAX_RESTART_MS,
+): SloResult {
+  if (restartMs > maxRestartMs) {
+    return {
+      passed: false,
+      violations: [
+        { scenario, kind: "restart-time", actual: restartMs, limit: maxRestartMs, unit: "ms" },
+      ],
+    };
+  }
+  return { passed: true, violations: [] };
+}
+
 /** Render violations as human-readable reporter lines for the CI step. */
 export function formatViolations(violations: SloViolation[]): string {
   if (violations.length === 0) return "SLO check passed";
   return violations
     .map((v) => {
-      const kind = v.kind === "p95" ? "p95 latency" : "error rate";
+      const kind =
+        v.kind === "p95"
+          ? "p95 latency"
+          : v.kind === "restart-time"
+            ? "restart time"
+            : "error rate";
       if (v.kind === "error-rate" && v.unit.includes("(no requests")) {
         return `  ✗ ${v.scenario}: ${kind} ${v.unit}`;
       }
-      const actual = v.kind === "p95" ? `${v.actual}ms` : `${(v.actual * 100).toFixed(2)}%`;
-      const limit = v.kind === "p95" ? `${v.limit}ms` : `${(v.limit * 100).toFixed(2)}%`;
+      const actual = v.kind === "error-rate" ? `${(v.actual * 100).toFixed(2)}%` : `${v.actual}ms`;
+      const limit = v.kind === "error-rate" ? `${(v.limit * 100).toFixed(2)}%` : `${v.limit}ms`;
       return `  ✗ ${v.scenario}: ${kind} ${actual} exceeds SLO ${limit}`;
     })
     .join("\n");

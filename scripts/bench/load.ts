@@ -8,6 +8,8 @@
  *   1. SSR page throughput + latency percentiles (p50/p95/p99)
  *   2. Server-function throughput
  *   3. Rate-limiter behavior under a burst (in-memory store)
+ *   4. Crash recovery (#129): kill -9 a real server process mid-run, then
+ *      measure restart time and post-restart traffic (see crash-recovery.ts)
  *
  * Usage:
  *   bun scripts/bench/load.ts            # full run
@@ -22,8 +24,16 @@ import { join } from "node:path";
 import { createApp } from "../../packages/core/src/createApp";
 import { createRateLimiter } from "../../packages/core/src/security/rate-limit";
 import { registerServerFunctions } from "../../packages/core/src/server-functions";
+import { runCrashRecoveryScenario } from "./crash-recovery";
+import { loadFor } from "./http-load";
 import type { ScenarioResult, SloThresholds } from "./slo";
-import { DEFAULT_SLOS, evaluateSlo, formatViolations } from "./slo";
+import {
+  DEFAULT_MAX_RESTART_MS,
+  DEFAULT_SLOS,
+  evaluateRestartSlo,
+  evaluateSlo,
+  formatViolations,
+} from "./slo";
 
 interface BenchArgs {
   concurrency: number;
@@ -43,71 +53,6 @@ function parseArgs(argv: string[]): BenchArgs {
     durationMs: Number(get("--duration") ?? 5) * 1000,
     route: get("--route") ?? "/about",
     enforceSlo: argv.includes("--slo"),
-  };
-}
-
-function percentile(sorted: number[], p: number): number {
-  if (sorted.length === 0) return 0;
-  const idx = Math.min(sorted.length - 1, Math.floor((p / 100) * sorted.length));
-  return sorted[idx] ?? 0;
-}
-
-interface LoadOptions {
-  method?: string;
-  headers?: Record<string, string>;
-  body?: BodyInit | null;
-}
-
-async function loadFor(
-  baseUrl: string,
-  path: string,
-  concurrency: number,
-  durationMs: number,
-  options: LoadOptions = {},
-): Promise<{ rps: number; p50: number; p95: number; p99: number; errors: number; count: number }> {
-  const url = `${baseUrl}${path}`;
-  const end = performance.now() + durationMs;
-  const latencies: number[] = [];
-  let done = 0;
-  let errors = 0;
-  let inflight = 0;
-
-  await new Promise<void>((resolve) => {
-    const worker = async () => {
-      while (performance.now() < end) {
-        const start = performance.now();
-        try {
-          const res = await fetch(url, {
-            method: options.method,
-            headers: options.headers,
-            body: options.body,
-          });
-          if (res.status >= 500) errors += 1;
-        } catch {
-          errors += 1;
-        }
-        latencies.push(performance.now() - start);
-        done += 1;
-      }
-      inflight -= 1;
-      if (inflight === 0) resolve();
-    };
-
-    for (let i = 0; i < concurrency; i += 1) {
-      inflight += 1;
-      worker();
-    }
-  });
-
-  const sorted = [...latencies].sort((a, b) => a - b);
-  const elapsedSec = durationMs / 1000;
-  return {
-    rps: Math.round(done / elapsedSec),
-    p50: Math.round(percentile(sorted, 50) * 100) / 100,
-    p95: Math.round(percentile(sorted, 95) * 100) / 100,
-    p99: Math.round(percentile(sorted, 99) * 100) / 100,
-    errors,
-    count: done,
   };
 }
 
@@ -234,6 +179,26 @@ export default function About({ loaderData }: { loaderData: { items: Array<{ id:
     burstBaseline: burstBase,
   };
 
+  // 4. Crash recovery (#129): kill -9 a real server process mid-run and
+  // measure (a) time from the kill to the respawned process serving its
+  // first successful request again, and (b) that traffic resumes cleanly
+  // once it has. See crash-recovery.ts's module docstring for why this spawns
+  // its own tiny test-only supervisor rather than exercising a restart
+  // feature that doesn't exist in this framework's deploy model.
+  const crashRecovery = await runCrashRecoveryScenario({
+    pagesDir: PAGES_DIR,
+    apiDir: API_DIR,
+    route: args.route,
+    postRestartDurationMs: 1000,
+    postRestartConcurrency: 8,
+    readyTimeoutMs: 10_000,
+  });
+  console.log("\nCrash recovery (kill -9 mid-run, then resume traffic)");
+  console.log(
+    `  restart: ${crashRecovery.restartMs}ms  requests: ${crashRecovery.postRestart.count}  p50: ${crashRecovery.postRestart.p50}ms  p95: ${crashRecovery.postRestart.p95}ms  p99: ${crashRecovery.postRestart.p99}ms  errors: ${crashRecovery.postRestart.errors}`,
+  );
+  report.scenarios = { ...report.scenarios, crashRecovery };
+
   server.stop(true);
 
   const outDir = join(import.meta.dir, "results");
@@ -243,7 +208,8 @@ export default function About({ loaderData }: { loaderData: { items: Array<{ id:
   console.log(`\nresults written to ${outPath}`);
 
   // Exit non-zero if any scenario produced server errors (500s).
-  const totalErrors = (page.errors ?? 0) + (serverFn.errors ?? 0);
+  const totalErrors =
+    (page.errors ?? 0) + (serverFn.errors ?? 0) + (crashRecovery.postRestart.errors ?? 0);
   if (totalErrors > 0) {
     console.error(`\nFAILED: ${totalErrors} server errors under load`);
     process.exit(1);
@@ -256,10 +222,22 @@ export default function About({ loaderData }: { loaderData: { items: Array<{ id:
     const scenarios: ScenarioResult[] = [
       { name: "ssr-page", p95: page.p95, count: page.count, errors: page.errors },
       { name: "server-fn", p95: serverFn.p95, count: serverFn.count, errors: serverFn.errors },
+      {
+        name: "crash-recovery-post-restart",
+        p95: crashRecovery.postRestart.p95,
+        count: crashRecovery.postRestart.count,
+        errors: crashRecovery.postRestart.errors,
+      },
     ];
     const sloResult = evaluateSlo(scenarios, defaultSloThresholds());
-    if (!sloResult.passed) {
-      console.error(formatViolations(sloResult.violations));
+    const restartResult = evaluateRestartSlo(
+      "crash-recovery",
+      crashRecovery.restartMs,
+      DEFAULT_MAX_RESTART_MS,
+    );
+    const violations = [...sloResult.violations, ...restartResult.violations];
+    if (violations.length > 0) {
+      console.error(formatViolations(violations));
       console.error(`\nFAILED: load-test SLO violation (see BENCHMARKS.md for the contract)`);
       process.exit(1);
     }
