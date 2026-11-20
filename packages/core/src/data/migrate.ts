@@ -358,6 +358,16 @@ export async function rollbackPostgresMigrations(
   const result: RollbackResult = { rolledBack: [], skipped: [] };
   if (steps <= 0) return result;
 
+  // `failed` is captured into a local instead of thrown from inside the
+  // callback, then rethrown after `begin()` returns -- same reason as
+  // runPostgresMigrations above: a bare `throw` here would abort the whole
+  // wrapping transaction on rollback, undoing every savepoint-released step
+  // already committed earlier in *this same* rollback call, not just the one
+  // that failed. That would silently contradict this function's own
+  // documented guarantee ("a failed down script doesn't lose progress
+  // already made").
+  let failed: unknown = null;
+
   await client.begin(async (tx) => {
     await tx.unsafe("SELECT pg_advisory_xact_lock($1)", [MIGRATION_LOCK_KEY]);
 
@@ -400,10 +410,12 @@ export async function rollbackPostgresMigrations(
       } catch (err) {
         await tx.unsafe(`ROLLBACK TO SAVEPOINT ${savepoint}`).catch(() => {});
         await tx.unsafe(`RELEASE SAVEPOINT ${savepoint}`).catch(() => {});
-        throw err;
+        failed = err;
+        break;
       }
     }
   });
 
+  if (failed !== null) throw failed;
   return result;
 }
