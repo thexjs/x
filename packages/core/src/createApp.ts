@@ -1163,6 +1163,81 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
     return new Response(null, { status: 204 });
   }
 
+  /**
+   * Shared request pipeline for both dev and prod. The two modes previously
+   * carried near-identical ~90-line copies of this logic that had already
+   * drifted out of sync once; `devExtras` is the single seam where dev
+   * injects its one real behavioral difference (the `/__x/reload` SSE
+   * endpoint), slotted in at the same point dev has always had it — right
+   * after the rate limiter and before revalidation. Everything else runs
+   * identically for both: health check -> metrics -> rate limit -> (dev
+   * reload) -> revalidation -> hydration-mismatch beacon -> server
+   * functions -> static assets -> islands -> image proxy -> route match ->
+   * 404.
+   */
+  function buildFetchInner(devExtras?: { reloadHandler: (req: Request) => Response | null }) {
+    return async (
+      req: Request,
+      server?: import("./security/rate-limit").RateLimitServer,
+    ): Promise<Response> => {
+      const url = new URL(req.url).pathname;
+
+      const healthResult = await healthHandler(req);
+      if (healthResult !== null) return healthResult;
+
+      if (metricsReporter?.handleMetrics) {
+        const metricsResult = await metricsReporter.handleMetrics(req);
+        if (metricsResult !== null) return metricsResult;
+      }
+
+      if (rateLimiter) {
+        const limited = await rateLimitMiddleware(rateLimiter, req, server);
+        if (limited !== null) {
+          metricsReporter?.incr("x_rate_limit_rejections_total", 1, { method: req.method });
+          return limited;
+        }
+      }
+
+      if (devExtras) {
+        const reloadResult = devExtras.reloadHandler(req);
+        if (reloadResult !== null) return reloadResult;
+      }
+
+      const revalidationResult = await handleRevalidation(req);
+      if (revalidationResult !== null) return revalidationResult;
+
+      const mismatchResult = await handleHydrationMismatch(req);
+      if (mismatchResult !== null) return mismatchResult;
+
+      const serverFnResult = await serverFnHandler(req);
+      if (serverFnResult !== null) return serverFnResult;
+
+      const staticAsset = await serveStaticAsset(publicDir, req);
+      if (staticAsset !== null) return staticAsset;
+
+      const islandBundle = serveIslandBundle(req);
+      if (islandBundle !== null) return islandBundle;
+
+      const proxiedImage = await imageProxyHandler(req);
+      if (proxiedImage !== null) return proxiedImage;
+
+      for (const h of handlers) {
+        const params = extractParams(h.entry.routePath, h.entry.paramNames, url);
+        if (params !== null) {
+          return h.handler(req);
+        }
+      }
+
+      for (const h of contentHandlers) {
+        if (h.entry.routePath === url) {
+          return h.handler(req);
+        }
+      }
+
+      return renderNotFound(req);
+    };
+  }
+
   if (options.development) {
     let rebuildTimeout: Timer | null = null;
     const sseClients = new Set<(event: string, data: string) => void>();
@@ -1233,108 +1308,60 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
       console.warn("[x] file watching not available on this platform");
     }
 
-    const devFetchInner = async (
-      req: Request,
-      server?: import("./security/rate-limit").RateLimitServer,
-    ) => {
-      const url = new URL(req.url).pathname;
+    // Dev's one real behavioral difference from prod: serves the
+    // `/__x/reload` live-reload SSE endpoint. Handed to `buildFetchInner` as
+    // `devExtras` so it's slotted into the shared pipeline at the exact spot
+    // dev has always had it (right after the rate limiter).
+    const reloadHandler = (req: Request): Response | null => {
+      if (new URL(req.url).pathname !== "/__x/reload") return null;
 
-      const healthResult = await healthHandler(req);
-      if (healthResult !== null) return healthResult;
+      const body = new ReadableStream({
+        start(controller) {
+          const encoder = new TextEncoder();
+          controller.enqueue(encoder.encode("event: hb\ndata: \n\n"));
+          const send = (event: string, data: string) => {
+            controller.enqueue(encoder.encode(`event: ${event}\ndata: ${data}\n\n`));
+          };
+          sseClients.add(send);
+          console.log(`[x][reload] client connected (${sseClients.size} total)`);
 
-      if (metricsReporter?.handleMetrics) {
-        const metricsResult = await metricsReporter.handleMetrics(req);
-        if (metricsResult !== null) return metricsResult;
-      }
-
-      if (rateLimiter) {
-        const limited = await rateLimitMiddleware(rateLimiter, req, server);
-        if (limited !== null) {
-          metricsReporter?.incr("x_rate_limit_rejections_total", 1, { method: req.method });
-          return limited;
-        }
-      }
-
-      if (url === "/__x/reload") {
-        const body = new ReadableStream({
-          start(controller) {
-            const encoder = new TextEncoder();
-            controller.enqueue(encoder.encode("event: hb\ndata: \n\n"));
-            const send = (event: string, data: string) => {
-              controller.enqueue(encoder.encode(`event: ${event}\ndata: ${data}\n\n`));
-            };
-            sseClients.add(send);
-            console.log(`[x][reload] client connected (${sseClients.size} total)`);
-
-            // Bun.serve's default idleTimeout is 10s — a connection that
-            // just sits open waiting for a future file-change event goes
-            // idle and gets killed by Bun mid-stream, which is what was
-            // producing ERR_INCOMPLETE_CHUNKED_ENCODING in the browser (see
-            // the "[Bun.serve]: request timed out after 10 seconds" log
-            // lines). A heartbeat well under that window keeps the
-            // connection active so it never hits the idle timeout.
-            const heartbeat = setInterval(() => {
-              try {
-                send("hb", "");
-              } catch (err) {
-                console.log(`[x][reload] heartbeat failed, clearing interval: ${String(err)}`);
-                clearInterval(heartbeat);
-              }
-            }, 5000);
-
-            req.signal.addEventListener("abort", () => {
+          // Bun.serve's default idleTimeout is 10s — a connection that
+          // just sits open waiting for a future file-change event goes
+          // idle and gets killed by Bun mid-stream, which is what was
+          // producing ERR_INCOMPLETE_CHUNKED_ENCODING in the browser (see
+          // the "[Bun.serve]: request timed out after 10 seconds" log
+          // lines). A heartbeat well under that window keeps the
+          // connection active so it never hits the idle timeout.
+          const heartbeat = setInterval(() => {
+            try {
+              send("hb", "");
+            } catch (err) {
+              console.log(`[x][reload] heartbeat failed, clearing interval: ${String(err)}`);
               clearInterval(heartbeat);
-              sseClients.delete(send);
-              console.log(`[x][reload] client disconnected (${sseClients.size} total)`);
-            });
-          },
-        });
-        // NOTE: no "Connection" header here on purpose — it's a hop-by-hop
-        // header that Bun's HTTP server manages itself based on real socket
-        // state. Setting it manually on a chunked/streamed response was
-        // producing malformed chunked framing (ERR_INCOMPLETE_CHUNKED_ENCODING
-        // in Chrome) because it fights with whatever Bun actually writes.
-        return new Response(body, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-          },
-        });
-      }
+            }
+          }, 5000);
 
-      const revalidationResult = await handleRevalidation(req);
-      if (revalidationResult !== null) return revalidationResult;
-
-      const mismatchResult = await handleHydrationMismatch(req);
-      if (mismatchResult !== null) return mismatchResult;
-
-      const serverFnResult = await serverFnHandler(req);
-      if (serverFnResult !== null) return serverFnResult;
-
-      const staticAsset = await serveStaticAsset(publicDir, req);
-      if (staticAsset !== null) return staticAsset;
-
-      const islandBundle = serveIslandBundle(req);
-      if (islandBundle !== null) return islandBundle;
-
-      const proxiedImage = await imageProxyHandler(req);
-      if (proxiedImage !== null) return proxiedImage;
-
-      for (const h of handlers) {
-        const params = extractParams(h.entry.routePath, h.entry.paramNames, url);
-        if (params !== null) {
-          return h.handler(req);
-        }
-      }
-
-      for (const h of contentHandlers) {
-        if (h.entry.routePath === url) {
-          return h.handler(req);
-        }
-      }
-
-      return renderNotFound(req);
+          req.signal.addEventListener("abort", () => {
+            clearInterval(heartbeat);
+            sseClients.delete(send);
+            console.log(`[x][reload] client disconnected (${sseClients.size} total)`);
+          });
+        },
+      });
+      // NOTE: no "Connection" header here on purpose — it's a hop-by-hop
+      // header that Bun's HTTP server manages itself based on real socket
+      // state. Setting it manually on a chunked/streamed response was
+      // producing malformed chunked framing (ERR_INCOMPLETE_CHUNKED_ENCODING
+      // in Chrome) because it fights with whatever Bun actually writes.
+      return new Response(body, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+        },
+      });
     };
+
+    const devFetchInner = buildFetchInner({ reloadHandler });
 
     const devFetchHardened = async (
       req: Request,
@@ -1368,63 +1395,10 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
     };
   }
 
-  // Production -- same iteration logic as dev, so dynamic routes, layouts,
+  // Production -- same shared pipeline as dev (via `buildFetchInner`), minus
+  // the dev-only `/__x/reload` endpoint, so dynamic routes, layouts,
   // middleware, static assets and 404 page all work identically.
-  const prodFetchInner = async (
-    req: Request,
-    server?: import("./security/rate-limit").RateLimitServer,
-  ) => {
-    const url = new URL(req.url).pathname;
-
-    const healthResult = await healthHandler(req);
-    if (healthResult !== null) return healthResult;
-
-    if (metricsReporter?.handleMetrics) {
-      const metricsResult = await metricsReporter.handleMetrics(req);
-      if (metricsResult !== null) return metricsResult;
-    }
-
-    if (rateLimiter) {
-      const limited = await rateLimitMiddleware(rateLimiter, req, server);
-      if (limited !== null) {
-        metricsReporter?.incr("x_rate_limit_rejections_total", 1, { method: req.method });
-        return limited;
-      }
-    }
-
-    const revalidationResult = await handleRevalidation(req);
-    if (revalidationResult !== null) return revalidationResult;
-
-    const mismatchResult = await handleHydrationMismatch(req);
-    if (mismatchResult !== null) return mismatchResult;
-
-    const serverFnResult = await serverFnHandler(req);
-    if (serverFnResult !== null) return serverFnResult;
-
-    const staticAsset = await serveStaticAsset(publicDir, req);
-    if (staticAsset !== null) return staticAsset;
-
-    const islandBundle = serveIslandBundle(req);
-    if (islandBundle !== null) return islandBundle;
-
-    const proxiedImage = await imageProxyHandler(req);
-    if (proxiedImage !== null) return proxiedImage;
-
-    for (const h of handlers) {
-      const params = extractParams(h.entry.routePath, h.entry.paramNames, url);
-      if (params !== null) {
-        return h.handler(req);
-      }
-    }
-
-    for (const h of contentHandlers) {
-      if (h.entry.routePath === url) {
-        return h.handler(req);
-      }
-    }
-
-    return renderNotFound(req);
-  };
+  const prodFetchInner = buildFetchInner();
 
   const prodFetchHardened = async (
     req: Request,
