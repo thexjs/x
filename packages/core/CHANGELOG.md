@@ -1,5 +1,19 @@
 # @thexjs/core
 
+## 1.14.1
+
+### Patch Changes
+
+- 04cd28e: Batch `transpileModules`'s route/layout/middleware/action compilation into a single `Bun.build` call instead of one invocation per file. For an app with hundreds of routes this previously meant hundreds of sequential bundler invocations, each paying its own build-setup overhead. Each build output is mapped back to its destination file via the build's metafile (which records the absolute source path each output came from), not by array position, since `Bun.build`'s output order isn't guaranteed to match the entrypoints order. On a build failure, the specific offending source file is still named in the error (`failed to transpile <path>`), attributed via the failing log's file position, falling back to a per-file rebuild only to pinpoint the culprit when that information isn't available.
+- c9bd272: Dedupe the dev and prod request pipelines in `createApp`. Both previously carried near-identical ~90-line copies of the same health-check -> metrics -> rate-limit -> revalidation -> hydration-mismatch -> server-functions -> static-assets -> islands -> image-proxy -> route-match -> 404 chain, which had already drifted out of sync once. They now share a single `buildFetchInner(devExtras?)`, with dev's one real behavioral difference — the `/__x/reload` SSE endpoint — injected at the same point dev has always had it. No behavioral change; the outer hardening/rate-limit/tracing/logging/metrics wrappers are untouched.
+- d35cff5: Fix a potential island bundle id collision: `islandEntryId` combined a route file's basename with a hand-rolled 32-bit rolling hash of its full path, which had a real (if small) chance of colliding for two different route files sharing a basename (e.g. two `index.tsx` files in different directories) on an app with many routes -- silently overwriting each other's compiled island bundle on disk. The hash now uses `Bun.hash` (64-bit, truncated to 16 hex characters), making this effectively impossible at any realistic route count. No caller changes needed.
+- 758c3cc: Precompile each route's matching `RegExp` once (at scan/registration time) instead of rebuilding it from the route pattern on every candidate checked for every request. Routing previously called `routePatternToRegex` — a fresh `new RegExp(...)` — for every route in the (precedence-sorted) handler list up to and including the one that matched, on every single request; for an app with many routes this meant repeated, immediately-garbage-collected regex compilations per request, adding GC pressure and P99 latency that scaled with routes × requests.
+
+  `RouteEntry` now carries a `matcher: RegExp` compiled once by `scanRoutes`/`scanApiDir`, and `extractParams` takes that precompiled matcher instead of a route-path string, doing a pure match with no construction. `server-functions.ts`'s action dispatch compiles its matcher once in `registerServerFunctions` and reuses it from the (per-request) registry snapshot instead of re-deriving a regex per action lookup. Adapter-generated entries (`@thexjs/adapter-node`, `@thexjs/adapter-vercel`) splice the compiled matcher in as a `new RegExp(...)` literal alongside the route's JSON-serializable fields, so the same precompilation survives into prebuilt serverless/edge bundles.
+
+  No behavior change for matching semantics — only how often the `RegExp` backing it gets built.
+- 09777ee: Give the dev-mode route-tree watcher test an explicit 20s timeout. It polls for up to 8s twice (new route appearing, then removed route disappearing) but had no timeout of its own, so it was at the mercy of bun:test's 5s default — flaky under CI resource contention, with no code defect behind it.
+
 ## 1.14.0
 
 ### Minor Changes
