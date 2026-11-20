@@ -1,4 +1,5 @@
 import { relative } from "node:path";
+import { routePatternToRegex } from "../router";
 import type { BuildManifest, CompiledModuleRef } from "./types";
 
 function importPath(from: string, ref: CompiledModuleRef): string {
@@ -126,11 +127,15 @@ export function generateAdapterEntry(manifest: BuildManifest, entryDir: string):
       isApi: r.isApi,
       filePath: rel(r.route.sourcePath),
     };
+    // `matcher` is a RegExp -- JSON can't carry it, so it's spliced in as a
+    // `new RegExp(...)` literal alongside the JSON-serializable fields above,
+    // rather than recompiled at request time (see RouteEntry.matcher, #161).
+    const matcher = routePatternToRegex(r.routePath);
     const layoutMods = r.layoutChain.map((l) => `${l.identifier}.default`).join(", ");
     const mwMods = r.middlewareChain.map((m) => `${m.identifier}.middleware`).join(", ");
     lines.push(
       "  {",
-      `    entry: ${JSON.stringify(entryObj)},`,
+      `    entry: { ...${JSON.stringify(entryObj)}, matcher: new RegExp(${JSON.stringify(matcher.source)}) },`,
       `    mode: ${JSON.stringify(r.mode)},`,
       ...(r.revalidate !== undefined ? [`    revalidate: ${r.revalidate},`] : []),
       `    module: ${r.route.identifier},`,

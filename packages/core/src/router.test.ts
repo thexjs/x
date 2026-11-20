@@ -5,6 +5,7 @@ import {
   extractParams,
   findLayoutChain,
   generateManifestSource,
+  routePatternToRegex,
   scanLayouts,
   scanRoutes,
 } from "./router";
@@ -136,6 +137,7 @@ describe("generateManifestSource", () => {
         routePath: "/:id2/*",
         paramNames: ["id2", "id"],
         isApi: false,
+        matcher: routePatternToRegex("/:id2/*"),
       },
     ]);
     const manifestPath = join(FIXTURE_DIR, "generated-x-routes-prefix.ts");
@@ -148,52 +150,81 @@ describe("generateManifestSource", () => {
 });
 
 describe("extractParams", () => {
+  // extractParams takes a precompiled matcher (RouteEntry.matcher), not a
+  // route-path string — it must be a pure match against the given RegExp,
+  // never derive its own (see routePatternToRegex, called once per route at
+  // scan time, and #161 for why recompiling per call/per request is a bug).
   test("extracts named params from URL", () => {
-    const result = extractParams("/posts/:id", ["id"], "/posts/hello-world");
+    const result = extractParams(routePatternToRegex("/posts/:id"), ["id"], "/posts/hello-world");
     expect(result).toEqual({ id: "hello-world" });
   });
 
   test("returns null for non-matching URL", () => {
-    const result = extractParams("/posts/:id", ["id"], "/about");
+    const result = extractParams(routePatternToRegex("/posts/:id"), ["id"], "/about");
     expect(result).toBeNull();
   });
 
   test("extracts catch-all params", () => {
-    const result = extractParams("/docs/*", ["slug"], "/docs/a/b/c");
+    const result = extractParams(routePatternToRegex("/docs/*"), ["slug"], "/docs/a/b/c");
     expect(result).toEqual({ slug: "a/b/c" });
   });
 
   test("matches root path", () => {
-    const result = extractParams("/", [], "/");
+    const result = extractParams(routePatternToRegex("/"), [], "/");
     expect(result).toEqual({});
   });
 
   test("matches static path", () => {
-    const result = extractParams("/about", [], "/about");
+    const result = extractParams(routePatternToRegex("/about"), [], "/about");
     expect(result).toEqual({});
   });
 
   test("escapes regex metacharacters in static segments", () => {
     // A literal `.` must match only the dot, not any character.
-    expect(extractParams("/v1.2", [], "/v1.2")).toEqual({});
-    expect(extractParams("/v1.2", [], "/v1x2")).toBeNull();
+    expect(extractParams(routePatternToRegex("/v1.2"), [], "/v1.2")).toEqual({});
+    expect(extractParams(routePatternToRegex("/v1.2"), [], "/v1x2")).toBeNull();
   });
 
   test.each(["+", "(", ")", "?", "|", "[", "]", "^", "$"])(
     "escapes literal %s in a static segment",
     (metachar) => {
       const routePath = `/tools/1${metachar}2`;
-      expect(extractParams(routePath, [], routePath)).toEqual({});
-      expect(extractParams(routePath, [], `/tools/1x2`)).toBeNull();
+      const matcher = routePatternToRegex(routePath);
+      expect(extractParams(matcher, [], routePath)).toEqual({});
+      expect(extractParams(matcher, [], `/tools/1x2`)).toBeNull();
     },
   );
 
   test("still treats :param and * as dynamic tokens", () => {
-    expect(extractParams("/releases/v1.2/:id", ["id"], "/releases/v1.2/42")).toEqual({
+    expect(
+      extractParams(routePatternToRegex("/releases/v1.2/:id"), ["id"], "/releases/v1.2/42"),
+    ).toEqual({
       id: "42",
     });
-    expect(extractParams("/docs/1.0/*", ["slug"], "/docs/1.0/a/b")).toEqual({
+    expect(extractParams(routePatternToRegex("/docs/1.0/*"), ["slug"], "/docs/1.0/a/b")).toEqual({
       slug: "a/b",
     });
+  });
+
+  test("matches a scanned route entry's precompiled matcher repeatedly without recompiling (#161)", () => {
+    touch("widgets/[id].tsx");
+    const routes = scanRoutes(FIXTURE_DIR);
+    const entry = routes.find((r) => r.routePath === "/widgets/:id");
+    expect(entry).toBeDefined();
+    const matcher = entry?.matcher;
+    expect(matcher).toBeInstanceOf(RegExp);
+
+    // Calling extractParams repeatedly against the same entry must reuse the
+    // same RegExp instance — the matcher is compiled once at scan time, not
+    // once per call/request.
+    for (let i = 0; i < 5; i++) {
+      const result = extractParams(
+        matcher as RegExp,
+        entry?.paramNames ?? [],
+        `/widgets/item-${i}`,
+      );
+      expect(result).toEqual({ id: `item-${i}` });
+      expect(entry?.matcher).toBe(matcher);
+    }
   });
 });

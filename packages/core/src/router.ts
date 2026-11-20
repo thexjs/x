@@ -6,6 +6,14 @@ export interface RouteEntry {
   routePath: string;
   paramNames: string[];
   isApi: boolean;
+  /**
+   * The route pattern compiled to a `RegExp` once, at scan time. Matching a
+   * request against a route must always go through this precompiled matcher
+   * (see `extractParams`) rather than calling `routePatternToRegex` again —
+   * recompiling a fresh RegExp per route per request is the hot-path
+   * regression tracked in #161.
+   */
+  matcher: RegExp;
 }
 
 export interface MiddlewareEntry {
@@ -23,11 +31,13 @@ export function scanPages(rootDir: string): RouteEntry[] {
 /** Scan API routes from a separate directory (not nested under pages/routes).
  *  Route paths are prefixed with /api so they match requests to /api/…. */
 export function scanApiDir(rootDir: string): RouteEntry[] {
-  return scanRoutes(rootDir).map((r) => ({
-    ...r,
-    routePath: r.routePath === "/" ? "/api" : `/api${r.routePath}`,
-    isApi: true,
-  }));
+  return scanRoutes(rootDir).map((r) => {
+    const routePath = r.routePath === "/" ? "/api" : `/api${r.routePath}`;
+    // The matcher must be recompiled for the rewritten (/api-prefixed) path —
+    // reusing the one built in toRouteEntry() for the original routePath
+    // would match the wrong URLs entirely.
+    return { ...r, routePath, isApi: true, matcher: routePatternToRegex(routePath) };
+  });
 }
 
 export function scanRoutes(rootDir: string): RouteEntry[] {
@@ -86,7 +96,7 @@ function toRouteEntry(relPath: string, filePath: string): RouteEntry {
   const joined = routeSegments.filter((s) => s.length > 0).join("/");
   const routePath = joined.length === 0 ? "/" : `/${joined}`;
 
-  return { filePath, routePath, paramNames, isApi };
+  return { filePath, routePath, paramNames, isApi, matcher: routePatternToRegex(routePath) };
 }
 
 export interface LayoutEntry {
@@ -237,13 +247,18 @@ export function routePatternToRegex(routePath: string): RegExp {
   return new RegExp(`^${escaped}$`);
 }
 
+/**
+ * Matches `url` against a precompiled route `matcher` (see
+ * `RouteEntry.matcher`, built once at scan time by `routePatternToRegex`).
+ * This is a pure match — it must never compile a new RegExp itself, since
+ * it runs once per candidate route on every request.
+ */
 export function extractParams(
-  routePath: string,
+  matcher: RegExp,
   paramNames: string[],
   url: string,
 ): Record<string, string> | null {
-  const regex = routePatternToRegex(routePath);
-  const match = url.match(regex);
+  const match = url.match(matcher);
   if (!match) return null;
 
   const params: Record<string, string> = {};
