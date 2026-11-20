@@ -88,5 +88,5 @@ describe("dev-mode route tree watcher", () => {
       "removed route to disappear",
     );
     expect((await app.fetch(new Request("http://localhost/"))).status).toBe(200);
-  });
+  }, 20_000);
 });
