@@ -93,6 +93,81 @@ export default function Home() {
     expect(res.stderr).toContain('unknown adapter "bogus"');
   });
 
+  test("--json emits NDJSON build:start/build:step/build:complete on stdout, nothing on stderr", () => {
+    const res = runCli(["build", "--cwd", FIXTURE_DIR, "--outDir", "dist-json", "--json"]);
+    expect(res.status).toBe(0);
+
+    const lines = res.stdout
+      .trim()
+      .split("\n")
+      .filter((l) => l.length > 0);
+    expect(lines.length).toBeGreaterThan(0);
+
+    const events = lines.map((line) => {
+      // Each line must parse as a single JSON object — NDJSON, not a stray
+      // human-readable line mixed in.
+      const parsed: unknown = JSON.parse(line);
+      expect(parsed).not.toBeNull();
+      expect(typeof parsed).toBe("object");
+      return parsed as { event: string };
+    });
+
+    expect(events.some((e) => e.event === "build:start")).toBe(true);
+    expect(events.some((e) => e.event === "build:complete")).toBe(true);
+    // No decorative UI (banner, ANSI, "[x]" prefix) leaking onto stdout.
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: asserting ANSI codes are absent
+    expect(/\x1b\[/.test(res.stdout)).toBe(false);
+    expect(res.stderr.trim()).toBe("");
+    rmSync(join(FIXTURE_DIR, "dist-json"), { recursive: true, force: true });
+  });
+
+  test("--format json is equivalent to --json", () => {
+    const res = runCli([
+      "build",
+      "--cwd",
+      FIXTURE_DIR,
+      "--outDir",
+      "dist-format-json",
+      "--format",
+      "json",
+    ]);
+    expect(res.status).toBe(0);
+    const lines = res.stdout
+      .trim()
+      .split("\n")
+      .filter((l) => l.length > 0);
+    for (const line of lines) {
+      expect(() => JSON.parse(line)).not.toThrow();
+    }
+    expect(lines.some((l) => JSON.parse(l).event === "build:complete")).toBe(true);
+    rmSync(join(FIXTURE_DIR, "dist-format-json"), { recursive: true, force: true });
+  });
+
+  test("--format text is the (default) human-readable mode", () => {
+    const res = runCli([
+      "build",
+      "--cwd",
+      FIXTURE_DIR,
+      "--outDir",
+      "dist-format-text",
+      "--format",
+      "text",
+    ]);
+    expect(res.status).toBe(0);
+    expect(res.stdout).toContain("[x]");
+    expect(res.stdout).toContain("build complete");
+    // Not JSON — a human-mode line fails to parse as a JSON object.
+    const firstLine = res.stdout.trim().split("\n")[0] as string;
+    expect(() => JSON.parse(firstLine)).toThrow();
+    rmSync(join(FIXTURE_DIR, "dist-format-text"), { recursive: true, force: true });
+  });
+
+  test("unknown --format value fails with a clear error", () => {
+    const res = runCli(["build", "--cwd", FIXTURE_DIR, "--format", "yaml"]);
+    expect(res.status).not.toBe(0);
+    expect(res.stderr).toContain('unknown "--format" value "yaml"');
+  });
+
   test("--version prints a semver", () => {
     const res = runCli(["--version", "--cwd", FIXTURE_DIR]);
     expect(res.status).toBe(0);
