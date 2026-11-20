@@ -112,20 +112,134 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;");
 }
 
+interface ListLine {
+  indent: number;
+  type: "ul" | "ol";
+  content: string;
+}
+
+function parseListLine(line: string): ListLine | null {
+  let m = /^(\s*)[-*]\s+(.*)$/.exec(line);
+  if (m) return { indent: m[1]?.length ?? 0, type: "ul", content: m[2] ?? "" };
+  m = /^(\s*)\d+\.\s+(.*)$/.exec(line);
+  if (m) return { indent: m[1]?.length ?? 0, type: "ol", content: m[2] ?? "" };
+  return null;
+}
+
 /**
  * Converts a contiguous block of `- item` / `1. item` lines into a `<ul>` /
- * `<ol>` element. Returns the block untouched when it isn't a list.
+ * `<ol>` element, recursing into more-indented runs of lines to build nested
+ * lists (indentation-based, like the rest of this hand-rolled parser — not a
+ * full CommonMark list-item parser). Returns the block untouched when it
+ * isn't a list at all.
  */
 function renderListBlock(block: string): string {
+  const rawLines = block.split("\n");
+  const lines: ListLine[] = [];
+  for (const l of rawLines) {
+    const parsed = parseListLine(l);
+    if (!parsed) return block;
+    lines.push(parsed);
+  }
+  if (lines.length === 0) return block;
+
+  let i = 0;
+  function parseLevel(indent: number): string {
+    // biome-ignore lint/style/noNonNullAssertion: guarded by the while loop's own `i < lines.length` check
+    const type = lines[i]!.type;
+    let out = "";
+    while (i < lines.length) {
+      const item = lines[i];
+      if (!item || item.indent !== indent) break;
+      i++;
+      let itemHtml = item.content;
+      const next = lines[i];
+      if (next && next.indent > indent) {
+        itemHtml += parseLevel(next.indent);
+      }
+      out += `<li>${itemHtml}</li>`;
+    }
+    return `<${type}>${out}</${type}>`;
+  }
+  // biome-ignore lint/style/noNonNullAssertion: lines.length === 0 already returned above
+  return parseLevel(lines[0]!.indent);
+}
+
+/**
+ * Converts a contiguous block of `> ...` lines into a `<blockquote>`.
+ * Note: this only handles a single flat paragraph per blockquote — nested
+ * blockquotes (`>>`) and multi-paragraph blockquotes are not supported (see
+ * the PR description for the full list of deferred GFM constructs).
+ */
+function renderBlockquote(block: string): string {
   const lines = block.split("\n");
-  const isUl = lines.every((l) => /^\s*[-*]\s+/.test(l));
-  const isOl = lines.every((l) => /^\s*\d+\.\s+/.test(l));
-  if (!isUl && !isOl) return block;
-  const tag = isUl ? "ul" : "ol";
-  const items = lines
-    .map((l) => `<li>${l.replace(/^\s*[-*]\s+/, "").replace(/^\s*\d+\.\s+/, "")}</li>`)
+  // `>` was escaped to `&gt;` by the upfront `escapeHtml` pass, so detection
+  // and stripping operate on the escaped form.
+  if (!lines.every((l) => /^&gt;/.test(l.trim()))) return block;
+  const stripped = lines.map((l) => l.trim().replace(/^&gt;[ \t]?/, "")).join("\n");
+  return `<blockquote><p>${applyHardBreaks(stripped)}</p></blockquote>`;
+}
+
+/**
+ * Splits one `| a | b |` table row into trimmed cell strings, tolerating a
+ * missing leading/trailing pipe.
+ */
+function parseTableRow(line: string): string[] {
+  let l = line.trim();
+  if (l.startsWith("|")) l = l.slice(1);
+  if (l.endsWith("|")) l = l.slice(0, -1);
+  return l.split("|").map((c) => c.trim());
+}
+
+const TABLE_ALIGN_CELL_RE = /^:?-{1,}:?$/;
+
+/**
+ * Renders a GFM pipe table (header row + `|---|:--:|` alignment row + body
+ * rows) into `<table>`. Returns `null` when the block isn't a table, so the
+ * caller can fall through to the next block kind.
+ *
+ * Known limitation: a `|` inside a cell (e.g. in inline code or a link) is
+ * not escapable here and will be read as a column separator — the same
+ * trade-off GFM table parsers make without a dedicated escape pass.
+ */
+function renderTableBlock(lines: string[]): string | null {
+  if (lines.length < 2 || !lines[0]?.includes("|")) return null;
+  const sepLine = lines[1];
+  if (!sepLine) return null;
+  const sepCells = parseTableRow(sepLine);
+  if (sepCells.length === 0 || !sepCells.every((c) => TABLE_ALIGN_CELL_RE.test(c))) return null;
+
+  const headerCells = parseTableRow(lines[0]);
+  const aligns = sepCells.map((c) => {
+    const left = c.startsWith(":");
+    const right = c.endsWith(":");
+    if (left && right) return "center";
+    if (right) return "right";
+    if (left) return "left";
+    return null;
+  });
+
+  const cellAttr = (i: number) => (aligns[i] ? ` style="text-align:${aligns[i]}"` : "");
+  const thead = `<thead><tr>${headerCells
+    .map((c, i) => `<th${cellAttr(i)}>${c}</th>`)
+    .join("")}</tr></thead>`;
+  const bodyRows = lines
+    .slice(2)
+    .map((line) => {
+      const cells = parseTableRow(line);
+      return `<tr>${cells.map((c, i) => `<td${cellAttr(i)}>${c}</td>`).join("")}</tr>`;
+    })
     .join("");
-  return `<${tag}>${items}</${tag}>`;
+
+  return `<table>${thead}<tbody>${bodyRows}</tbody></table>`;
+}
+
+/**
+ * Converts a trailing hard line break — two or more spaces, or a backslash,
+ * immediately before a newline — into `<br>`, GFM-style.
+ */
+function applyHardBreaks(text: string): string {
+  return text.replace(/( {2,}|\\)\n/g, "<br>\n");
 }
 
 const ALLOWED_LINK_SCHEMES = new Set(["http", "https", "mailto"]);
@@ -196,6 +310,17 @@ function isSafeLinkUrl(url: string): boolean {
   return scheme === undefined || ALLOWED_LINK_SCHEMES.has(scheme);
 }
 
+/**
+ * Matches a reference-link definition line, e.g. `[ref]: https://example.com`
+ * (optionally followed by a quoted/parenthesized title, which this parser
+ * ignores — titles are a deferred GFM detail, see the PR description).
+ */
+const REF_DEFINITION_RE =
+  /^[ \t]{0,3}\[([^\]]+)\]:[ \t]*(\S+)[ \t]*(?:"[^"]*"|'[^']*'|\([^)]*\))?[ \t]*$/gm;
+
+/** Matches a line that is only `---`, `***`, or `___` (3+ chars) — a horizontal rule. */
+const HORIZONTAL_RULE_RE = /^ {0,3}(?:-{3,}|\*{3,}|_{3,})[ \t]*$/gm;
+
 export function renderMarkdown(md: string): string {
   const inlineCodes: string[] = [];
   const fences: string[] = [];
@@ -222,7 +347,18 @@ export function renderMarkdown(md: string): string {
     return `__X_FENCE_${fences.length - 1}__`;
   });
 
+  // Reference-style link definitions (`[ref]: url`) can appear anywhere in
+  // the document, so pull them into a lookup map — keyed case-insensitively,
+  // per the GFM spec — before any other pass runs, and drop the definition
+  // lines themselves (they render nothing).
+  const refs = new Map<string, string>();
+  html = html.replace(REF_DEFINITION_RE, (_m, ref, url) => {
+    refs.set(String(ref).toLowerCase(), url);
+    return "";
+  });
+
   html = html
+    .replace(HORIZONTAL_RULE_RE, "<hr>")
     .replace(/^### (.+)$/gm, "<h3>$1</h3>")
     .replace(/^## (.+)$/gm, "<h2>$1</h2>")
     .replace(/^# (.+)$/gm, "<h1>$1</h1>")
@@ -232,9 +368,47 @@ export function renderMarkdown(md: string): string {
     })
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/\*([^*]+)\*/g, "<em>$1</em>")
+    .replace(/~~([^~]+)~~/g, "<del>$1</del>")
+    // Images MUST be processed before inline links: both use `[text](url)`,
+    // differing only by the leading `!`, and the link regex below would
+    // otherwise match the `[alt](src)` portion of `![alt](src)` and leave a
+    // stray, un-linked `!` behind. Same URL-scheme sanitizer as links — an
+    // image is just as capable of carrying a `javascript:` URL as a link is
+    // (the attribute itself is inert, but we reject on principle and to stay
+    // consistent with every other URL-accepting construct here).
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_m, alt, src) => {
+      const clean = stripUrlControlChars(src);
+      return isSafeLinkUrl(clean) ? `<img src="${clean}" alt="${alt}">` : alt;
+    })
+    // Reference-style links: `[text][ref]` resolves against the `refs` map
+    // collected above; `[text][]` is the shortcut form that reuses `text` as
+    // the ref. An unresolved reference is left as literal text (its brackets
+    // included) rather than silently dropped.
+    .replace(/\[([^\]]+)\]\[([^\]]*)\]/g, (m, text, ref) => {
+      const key = String(ref || text).toLowerCase();
+      const url = refs.get(key);
+      if (url === undefined) return m;
+      const clean = stripUrlControlChars(url);
+      return isSafeLinkUrl(clean) ? `<a href="${clean}">${text}</a>` : text;
+    })
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, text, href) => {
       const clean = stripUrlControlChars(href);
       return isSafeLinkUrl(clean) ? `<a href="${clean}">${text}</a>` : text;
+    })
+    // Autolinks: `<https://example.com>` / `<mailto:a@b.com>` survive the
+    // upfront `escapeHtml` pass as `&lt;...&gt;`, so they're matched in their
+    // escaped form. Scheme-prefixed autolinks still run through the same
+    // sanitizer as every other URL-accepting construct; the scheme is
+    // already constrained by the regex, but this keeps one code path for
+    // "is this URL safe to emit" rather than two.
+    .replace(/&lt;((?:https?|mailto):\S+?)&gt;/gi, (m, url) => {
+      const clean = stripUrlControlChars(url);
+      return isSafeLinkUrl(clean) ? `<a href="${clean}">${clean}</a>` : m;
+    })
+    // Bare-email autolinks (`<a@example.com>`) are always rendered as
+    // `mailto:` — there's no scheme in the source to validate.
+    .replace(/&lt;([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})&gt;/g, (_m, email) => {
+      return `<a href="mailto:${email}">${email}</a>`;
     })
     .replace(/__X_CODE_(\d+)__/g, (_m, i) => `<code>${inlineCodes[Number.parseInt(i, 10)]}</code>`);
 
@@ -245,11 +419,26 @@ export function renderMarkdown(md: string): string {
     .map((b) => {
       const t = b.trim();
       if (!t) return "";
+
+      const lines = t.split("\n");
+      const table = renderTableBlock(lines);
+      if (table !== null) return table;
+
+      const blockquote = renderBlockquote(t);
+      if (blockquote !== t) return blockquote;
+
       const listBlock = renderListBlock(t);
       if (listBlock !== t) return listBlock;
-      if (t.startsWith("<h") || t.startsWith("<pre") || t.startsWith("<ul") || t.startsWith("<ol"))
+
+      if (
+        t.startsWith("<h") ||
+        t.startsWith("<pre") ||
+        t.startsWith("<ul") ||
+        t.startsWith("<ol") ||
+        t === "<hr>"
+      )
         return t;
-      return `<p>${t}</p>`;
+      return `<p>${applyHardBreaks(t)}</p>`;
     })
     .join("\n");
 

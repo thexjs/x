@@ -402,3 +402,190 @@ describe("renderMarkdown link URL sanitization", () => {
     expect(html).toContain('<a href="//cdn.example.com/x">proto</a>');
   });
 });
+
+describe("renderMarkdown images", () => {
+  test("renders an image with escaped alt text", () => {
+    const html = renderMarkdown("![a cat](https://example.com/cat.png)");
+    expect(html).toContain('<img src="https://example.com/cat.png" alt="a cat">');
+  });
+
+  test("rejects a javascript: image src and renders only the alt text", () => {
+    const html = renderMarkdown("![bad](javascript:alert(1))");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("src=");
+    expect(html).toContain("bad");
+  });
+
+  test("rejects a data: image src", () => {
+    const html = renderMarkdown("![bad](data:text/html,<script>alert(1)</script>)");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("<script>");
+  });
+
+  test("does not let an image swallow a following inline link", () => {
+    const html = renderMarkdown(
+      "![alt](https://example.com/img.png) and [a link](https://example.com)",
+    );
+    expect(html).toContain('<img src="https://example.com/img.png" alt="alt">');
+    expect(html).toContain('<a href="https://example.com">a link</a>');
+  });
+
+  test("escapes markup in alt text to prevent injection", () => {
+    const html = renderMarkdown("![<script>alert(1)</script>](https://example.com/x.png)");
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+});
+
+describe("renderMarkdown GFM tables", () => {
+  test("renders a basic table with header and body rows", () => {
+    const html = renderMarkdown("| Name | Age |\n|------|-----|\n| Alice | 30 |\n| Bob | 25 |");
+    expect(html).toContain("<table>");
+    expect(html).toContain("<thead><tr><th>Name</th><th>Age</th></tr></thead>");
+    expect(html).toContain("<td>Alice</td>");
+    expect(html).toContain("<td>Bob</td>");
+    expect(html).toContain("</table>");
+  });
+
+  test("applies column alignment from the separator row", () => {
+    const html = renderMarkdown("| L | C | R |\n|:---|:---:|---:|\n| a | b | c |");
+    expect(html).toContain('<th style="text-align:left">L</th>');
+    expect(html).toContain('<th style="text-align:center">C</th>');
+    expect(html).toContain('<th style="text-align:right">R</th>');
+  });
+
+  test("tolerates missing leading/trailing pipes", () => {
+    const html = renderMarkdown("a | b\n---|---\n1 | 2");
+    expect(html).toContain("<table>");
+    expect(html).toContain("<th>a</th>");
+    expect(html).toContain("<td>1</td>");
+  });
+
+  test("leaves a non-table block alone", () => {
+    const html = renderMarkdown("Just a | pipe in prose, not a table.");
+    expect(html).not.toContain("<table>");
+    expect(html).toContain("<p>Just a | pipe in prose, not a table.</p>");
+  });
+});
+
+describe("renderMarkdown blockquotes", () => {
+  test("renders a single-line blockquote", () => {
+    const html = renderMarkdown("> A quoted line.");
+    expect(html).toContain("<blockquote><p>A quoted line.</p></blockquote>");
+  });
+
+  test("renders a multi-line blockquote as one block", () => {
+    const html = renderMarkdown("> Line one\n> Line two");
+    expect(html).toContain("<blockquote>");
+    expect(html).toContain("Line one");
+    expect(html).toContain("Line two");
+    expect(html).toContain("</blockquote>");
+  });
+
+  test("escapes markup inside a blockquote", () => {
+    const html = renderMarkdown("> <script>alert(1)</script>");
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+});
+
+describe("renderMarkdown horizontal rules", () => {
+  test("renders --- as an hr", () => {
+    const html = renderMarkdown("Above\n\n---\n\nBelow");
+    expect(html).toContain("<hr>");
+  });
+
+  test("renders *** and ___ as an hr", () => {
+    expect(renderMarkdown("***")).toContain("<hr>");
+    expect(renderMarkdown("___")).toContain("<hr>");
+  });
+});
+
+describe("renderMarkdown nested lists", () => {
+  test("renders a nested unordered list", () => {
+    const html = renderMarkdown("- one\n  - nested one\n  - nested two\n- two");
+    expect(html).toContain("<li>one<ul><li>nested one</li><li>nested two</li></ul></li>");
+    expect(html).toContain("<li>two</li>");
+  });
+
+  test("renders a flat list the same as before (no regression)", () => {
+    const html = renderMarkdown("- one\n- two\n- three");
+    expect(html).toBe("<ul><li>one</li><li>two</li><li>three</li></ul>");
+  });
+});
+
+describe("renderMarkdown hard line breaks", () => {
+  test("converts two trailing spaces before a newline into <br>", () => {
+    const html = renderMarkdown("line one  \nline two");
+    expect(html).toContain("line one<br>");
+    expect(html).toContain("line two");
+  });
+
+  test("converts a trailing backslash before a newline into <br>", () => {
+    const html = renderMarkdown("line one\\\nline two");
+    expect(html).toContain("line one<br>");
+  });
+
+  test("does not add <br> for a single trailing space", () => {
+    const html = renderMarkdown("line one \nline two");
+    expect(html).not.toContain("<br>");
+  });
+});
+
+describe("renderMarkdown autolinks", () => {
+  test("renders a bare https autolink", () => {
+    const html = renderMarkdown("See <https://example.com> for docs.");
+    expect(html).toContain('<a href="https://example.com">https://example.com</a>');
+  });
+
+  test("renders a bare email autolink as mailto", () => {
+    const html = renderMarkdown("Contact <jane@example.com>.");
+    expect(html).toContain('<a href="mailto:jane@example.com">jane@example.com</a>');
+  });
+
+  test("does not autolink an unsafe scheme", () => {
+    const html = renderMarkdown("<javascript:alert(1)>");
+    expect(html).not.toContain("<a");
+    expect(html).not.toContain("href");
+  });
+});
+
+describe("renderMarkdown reference-style links", () => {
+  test("resolves a reference link against its definition", () => {
+    const html = renderMarkdown(
+      "See [the docs][docs-ref].\n\n[docs-ref]: https://example.com/docs",
+    );
+    expect(html).toContain('<a href="https://example.com/docs">the docs</a>');
+    expect(html).not.toContain("[docs-ref]:");
+  });
+
+  test("resolves the shortcut reference form [text][]", () => {
+    const html = renderMarkdown("See [Example][].\n\n[Example]: https://example.com");
+    expect(html).toContain('<a href="https://example.com">Example</a>');
+  });
+
+  test("is case-insensitive when matching the reference label", () => {
+    const html = renderMarkdown("See [docs][DOCS-REF].\n\n[docs-ref]: https://example.com/docs");
+    expect(html).toContain('<a href="https://example.com/docs">docs</a>');
+  });
+
+  test("rejects an unsafe scheme in a reference link definition", () => {
+    const html = renderMarkdown("[run][x]\n\n[x]: javascript:alert(1)");
+    expect(html).not.toContain("<a");
+    expect(html).not.toContain("href");
+    expect(html).toContain("run");
+  });
+
+  test("leaves an unresolved reference link as literal text", () => {
+    const html = renderMarkdown("[nothing][missing-ref]");
+    expect(html).not.toContain("<a");
+    expect(html).toContain("[nothing][missing-ref]");
+  });
+});
+
+describe("renderMarkdown strikethrough", () => {
+  test("renders ~~text~~ as <del>", () => {
+    const html = renderMarkdown("~~deleted~~ text");
+    expect(html).toContain("<del>deleted</del> text");
+  });
+});
