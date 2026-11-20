@@ -77,6 +77,30 @@ my-app/
   content/       # markdown collections
 ```
 
+## Bring your own runtime
+
+A fair worry with a solo-maintained framework: what happens to your app if
+the project stalls? For `x`, less than it would for a framework that only
+runs on its own hosting platform — `x` doesn't have one.
+- **Bun process** — the default. `x build` + `bun dist/server/index.ts` on
+  any VPS, bare metal, or behind `systemd`/`pm2`.
+- **Docker** — the multi-stage [`Dockerfile`](./Dockerfile) at the repo root
+  builds and runs any example as a container; works on any OCI host.
+- **Vercel** — [`@thexjs/adapter-vercel`](packages/adapter-vercel) emits a
+  real Build Output API v3 tree, no `vercel.json` needed.
+- **Node-only hosts (Railway, Render, a bare VPS)** —
+  [`@thexjs/adapter-node`](packages/adapter-node) produces a standalone
+  server with zero Bun dependency at runtime.
+- **Fly.io** — a committed [`fly.toml`](./fly.toml) builds the same Docker
+  image above.
+- **Anything else** — adapters aren't special-cased into the framework; both
+  of the ones above are ordinary consumers of the adapter SDK exported from
+  `@thexjs/core/adapter`. Writing a new one is scoped work, not a fork.
+
+None of this requires touching your app code to move — see
+[DEPLOY.md](./DEPLOY.md) for the full walkthrough of every target above, plus
+how to write your own adapter.
+
 ## Status
 
 **Pre-1.0, in maintenance mode.** The author is busy with college; reviews and merges happen on a best-effort weekly cadence, and the project leans on community contributors for everything beyond that. The API is still settling — expect breaking changes between minor releases on pre-1.0 packages, and pin exact versions if that matters to you. None of that is a disclaimer to skip past: treat `x` as something to learn from, prototype with, or build something small on — not yet a dependency a team should bet production on without reading [ROADMAP.md](./ROADMAP.md)'s honest accounting of what's stable versus still moving.

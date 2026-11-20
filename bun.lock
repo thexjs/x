@@ -29,6 +29,7 @@
       },
       "devDependencies": {
         "@tailwindcss/cli": "^4.3.3",
+        "@thexjs/adapter-node": "workspace:*",
         "@thexjs/adapter-vercel": "workspace:*",
         "@thexjs/cli": "workspace:*",
         "@types/react": "^19.3.0",
