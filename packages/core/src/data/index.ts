@@ -2,6 +2,9 @@ export {
   type MigrationOptions,
   type MigrationResult,
   type PostgresMigrationResult,
+  type RollbackResult,
+  rollbackPostgresMigrations,
+  rollbackSQLiteMigrations,
   runPostgresMigrations,
   runSQLiteMigrations,
 } from "./migrate";

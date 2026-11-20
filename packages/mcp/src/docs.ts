@@ -325,6 +325,14 @@ Both come with a versioned migration runner (\`runSQLiteMigrations\` /
 \`runPostgresMigrations\`), tracked in a \`_x_migrations\` table. There is no
 Prisma/Drizzle dependency baked in — you write SQL directly, or bring your
 own ORM on top of the same connection.
+
+Migrations can be rolled back: an up file like \`001_create_users.sql\` can have
+an optional \`001_create_users.down.sql\` sibling that reverts it.
+\`rollbackSQLiteMigrations\` / \`rollbackPostgresMigrations\` roll back N
+applied migrations (default 1), most-recently-applied first, and stop (rather
+than skip past) the first migration with no down file. From the CLI:
+\`x migrate down [N]\` (reads \`--dir\`/\`--sqlite\`/\`--postgres\`, or
+\`DATABASE_URL\` for Postgres).
 `.trim(),
   },
 

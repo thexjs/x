@@ -15,6 +15,7 @@ x dev              # start the dev server with hot reload
 x build            # build for production -> .x/ (static export + server bundle)
 x start            # run the production server (run `x build` first)
 x doctor           # diagnose the project: config, dirs, env isolation, dependency health
+x migrate down [N] # roll back N applied migrations (default 1), most-recently-applied first
 
 x run dev          # "run" is optional — an alias, for npm/bun muscle memory
 
@@ -22,6 +23,9 @@ options:
 --cwd <dir>        # run as if started inside <dir> instead of the current directory
 --adapter <name>   # build target, e.g. "vercel" (default: Bun server -> .x/)
 --outDir <dir>     # build/start output directory (default: .x)
+--dir <path>       # migrations directory for "migrate down" (default: src/lib/migrations)
+--sqlite <path>    # SQLite database file for "migrate down" (default: data/dev.db)
+--postgres         # use Postgres for "migrate down" (reads DATABASE_URL)
 
 -h, --help         # show help
 -v, --version      # print the installed @thexjs/cli version
@@ -64,6 +68,7 @@ If no config file is found, it falls back to sensible defaults: `src/pages` (or 
   - `.x/server/index.ts`: a server entry covering any page left in the default `"server"` mode, plus your API routes. Requires a Bun-capable host to actually run (see `x start`).
 - **`x start`**: runs `.x/server/index.ts` under `bun` with `NODE_ENV=production`. Requires `x build` to have been run first; exits with an error if `.x/server/index.ts` is missing. If the build has no server entry (a fully static app), it serves `.x/client/` as a plain static server with an SPA `index.html` fallback.
 - **`x build --adapter vercel`**: emits a `.vercel/output` tree (Build Output API v3) instead of `.x/`, for deployment to Vercel (see `@thexjs/adapter-vercel`). `--outDir <dir>` relocates the build output, e.g. `x build --outDir dist`.
+- **`x migrate down [N]`**: rolls back `N` applied migrations (default `1`), most-recently-applied first, using `@thexjs/core/data`'s `rollbackSQLiteMigrations`/`rollbackPostgresMigrations`. Reads migrations from `--dir <path>` (default `src/lib/migrations`). Uses SQLite at `--sqlite <path>` (default `data/dev.db`) unless `--postgres` is passed or `DATABASE_URL` is set, in which case it rolls back against Postgres instead. A migration with no `.down.sql` sibling file can't be reverted — rollback stops there (reported, with a non-zero exit) instead of skipping past it.
 
 ## Deployment note
 

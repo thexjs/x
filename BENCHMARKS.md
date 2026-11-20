@@ -28,6 +28,9 @@ then measures:
    origin check).
 3. **Rate-limiter behavior under burst** (limit 10/60s, 100 rapid attempts →
    expect exactly 10 allowed, 90 rejected).
+4. **Crash recovery** (#129): spawns the app as a real child process,
+   `kill -9`'s it mid-run, and measures how long it takes to come back and
+   serve traffic again. See "Crash recovery" below for the scope decision.
 
 Machine-readable JSON results are written to `scripts/bench/results/`.
 
@@ -51,11 +54,13 @@ Machine-readable JSON results are written to `scripts/bench/results/`.
 The load test gates the build in CI (`bench` job, `--slo`). These are the
 agreed targets; a run that misses any of them fails the PR:
 
-| SLO                         | Target                  | Meaning                                                   |
-| --------------------------- | ----------------------- | --------------------------------------------------------- |
-| p95 SSR page latency        | **< 500 ms**            | server-mode page with a loader, rendered end-to-end       |
-| p95 server-function latency | **< 500 ms**            | JSON round-trip through `/__x/actions/*` incl. CSRF check |
-| Error rate                  | **< 0.1 %** of requests | any ≥ 500 response or thrown fetch in a scenario window   |
+| SLO                         | Target                  | Meaning                                                     |
+| --------------------------- | ----------------------- | ----------------------------------------------------------- |
+| p95 SSR page latency        | **< 500 ms**            | server-mode page with a loader, rendered end-to-end         |
+| p95 server-function latency | **< 500 ms**            | JSON round-trip through `/__x/actions/*` incl. CSRF check   |
+| Error rate                  | **< 0.1 %** of requests | any ≥ 500 response or thrown fetch in a scenario window     |
+| Crash-recovery restart time | **< 5 s**               | kill -9 to the respawned process's first successful request |
+| Post-restart p95 latency    | **< 500 ms**            | traffic generated against the server once it has resumed    |
 
 Thresholds are deliberately loose versus the baseline table below: CI runners
 are shared and 2–4× slower than a local Apple-Silicon Mac, and the point of the
@@ -86,9 +91,39 @@ Notes:
   the client side of the bench (not the server) is the bottleneck. Rerun with
   `--concurrency 8` for tighter tail latencies.
 
+## Crash recovery (#129)
+
+The issue asked for a scenario that injects a real crash (`kill -9` the server
+process) and asserts the process restarts and serves traffic again within a
+bound, plus a pinned restart-time metric.
+
+**Scope decision**: this repo has no process supervisor of its own. `x start`
+(`packages/cli/src/index.ts`, `cmdStart`) just spawns `bun <serverEntry>` and
+exits when that child exits — restarting a crashed process is explicitly the
+deploy platform's job (see DEPLOY.md: "a process manager restarting one
+process (systemd, pm2, your platform's own supervisor)"). So there's nothing
+in-framework to `kill -9` and watch "restart itself".
+
+Rather than quietly narrowing the scenario to "time to first request" (which
+wouldn't exercise a crash at all), `scripts/bench/crash-recovery.ts` adds a
+tiny supervisor _for the test itself_ that plays the role DEPLOY.md assigns to
+systemd/pm2/the platform: spawn the server as a real child process, and when
+it's killed, spawn a fresh one. That lets the test actually do what the issue
+describes — kill -9 mid-run, then assert traffic resumes within a bound —
+without inventing a production restart feature that was never part of this
+framework's deploy model. If x ever ships its own supervisor, this scenario
+should be pointed at that instead of its own stand-in.
+
+`restartMs` is measured from the `kill -9` call to the respawned process's
+first successful HTTP response, so it captures the whole outage window
+(detect-death + spawn + boot + first response). It's checked as a pinned
+metric (`evaluateRestartSlo` in `scripts/bench/slo.ts`) separately from the
+request-latency/error-rate SLOs, since "how long the server was unreachable"
+isn't a per-request latency.
+
 ## CI
 
 The `bench` job in `.github/workflows/ci.yml` runs the load test on every PR
 **with `--slo`, and gates the merge**: `continue-on-error` was removed, so a
-run that misses an SLO (or produces 500s, or breaks the rate limiter) fails the
-job. See the SLO table above for the contract.
+run that misses an SLO (or produces 500s, breaks the rate limiter, or fails
+crash recovery) fails the job. See the SLO table above for the contract.

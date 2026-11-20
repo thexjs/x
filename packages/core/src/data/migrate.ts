@@ -1,6 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PostgresClient } from "./postgres";
 
@@ -42,6 +42,37 @@ function hashContent(sql: string): string {
   return createHash("sha256").update(sql).digest("hex");
 }
 
+// Down migrations are optional sibling files next to the up migration they
+// revert: "001_create_users.sql" pairs with "001_create_users.down.sql" in
+// the same directory. This is additive-only on purpose -- every up-migration
+// file already checked into this repo (and in the wild) keeps its exact name
+// and content, so adopting rollback never requires renaming or rewriting an
+// existing migration. A migration with no "*.down.sql" sibling simply can't
+// be rolled back (see rollback*Migrations below).
+function toDownFileName(upFile: string): string {
+  return upFile.replace(/\.sql$/, ".down.sql");
+}
+
+// Down-migration files end in ".sql" too, so the up-runners must exclude them
+// explicitly -- otherwise a "*.down.sql" file would get picked up and applied
+// as if it were its own up-migration.
+function isUpMigrationFile(f: string): boolean {
+  return f.endsWith(".sql") && !f.endsWith(".down.sql");
+}
+
+export interface RollbackResult {
+  /** Up-migration names that were rolled back, most-recently-applied first. */
+  rolledBack: string[];
+  /**
+   * Up-migration names with no `.down.sql` counterpart. A migration that
+   * can't be reverted can't be safely skipped over either (an older
+   * migration's down script may assume the newer schema is already gone), so
+   * rollback stops at the first one it finds -- this array holds at most one
+   * entry.
+   */
+  skipped: string[];
+}
+
 export function runSQLiteMigrations(
   db: Database,
   migrationsDir: string,
@@ -70,9 +101,7 @@ export function runSQLiteMigrations(
 
   let files: string[];
   try {
-    files = readdirSync(migrationsDir)
-      .filter((f) => f.endsWith(".sql"))
-      .sort(compareMigrationNames);
+    files = readdirSync(migrationsDir).filter(isUpMigrationFile).sort(compareMigrationNames);
   } catch {
     return { applied: [], skipped: [], drifted: [], unknownContent: [] };
   }
@@ -146,9 +175,7 @@ export async function runPostgresMigrations(
 ): Promise<PostgresMigrationResult> {
   let files: string[];
   try {
-    files = readdirSync(migrationsDir)
-      .filter((f) => f.endsWith(".sql"))
-      .sort(compareMigrationNames);
+    files = readdirSync(migrationsDir).filter(isUpMigrationFile).sort(compareMigrationNames);
   } catch {
     return { applied: [], skipped: [], drifted: [], unknownContent: [] };
   }
@@ -255,5 +282,140 @@ export async function runPostgresMigrations(
   // failure once the transaction is closed.
   if (failed !== null) throw failed;
 
+  return result;
+}
+
+/**
+ * Rolls back up to `steps` applied migrations (default: 1), most-recently-
+ * applied first, by running each one's `.down.sql` sibling file and removing
+ * its `_x_migrations` bookkeeping row. A migration with no down file can't be
+ * reverted -- rollback stops there (see `RollbackResult.skipped`) rather than
+ * skipping it, since an older migration's down script may assume the newer
+ * schema is still in place.
+ *
+ * Each down migration runs in its own transaction (same per-file isolation
+ * as the up runner): if a down script throws, nothing it changed is kept and
+ * its bookkeeping row stays, so re-running rollback after a fix retries it.
+ */
+export function rollbackSQLiteMigrations(
+  db: Database,
+  migrationsDir: string,
+  steps = 1,
+): RollbackResult {
+  const result: RollbackResult = { rolledBack: [], skipped: [] };
+  if (steps <= 0) return result;
+
+  let appliedRows: { name: string }[];
+  try {
+    appliedRows = db.query("SELECT name FROM _x_migrations").all() as { name: string }[];
+  } catch {
+    // No bookkeeping table yet -- nothing has ever been applied.
+    return result;
+  }
+
+  const appliedNames = appliedRows
+    .map((r) => r.name)
+    .sort(compareMigrationNames)
+    .reverse();
+
+  for (const name of appliedNames) {
+    if (result.rolledBack.length >= steps) break;
+
+    const downFile = toDownFileName(name);
+    const downPath = join(migrationsDir, downFile);
+    if (!existsSync(downPath)) {
+      console.warn(
+        `[x] no down migration for "${name}" (expected "${downFile}") -- stopping rollback here`,
+      );
+      result.skipped.push(name);
+      break;
+    }
+
+    const sql = readFileSync(downPath, "utf-8");
+    db.transaction(() => {
+      db.run(sql);
+      db.run("DELETE FROM _x_migrations WHERE name = ?1", [name]);
+    })();
+    console.log(`[x] migration rolled back: ${name}`);
+    result.rolledBack.push(name);
+  }
+
+  return result;
+}
+
+/**
+ * Postgres counterpart to `rollbackSQLiteMigrations`. Holds the same
+ * `pg_advisory_xact_lock` as `runPostgresMigrations` for the duration of the
+ * rollback, so a rollback can't race a concurrent migration run (or another
+ * rollback) across replicas, and reverts each migration under its own
+ * savepoint so a failed down script doesn't lose progress already made.
+ */
+export async function rollbackPostgresMigrations(
+  client: PostgresClient,
+  migrationsDir: string,
+  steps = 1,
+): Promise<RollbackResult> {
+  const result: RollbackResult = { rolledBack: [], skipped: [] };
+  if (steps <= 0) return result;
+
+  // `failed` is captured into a local instead of thrown from inside the
+  // callback, then rethrown after `begin()` returns -- same reason as
+  // runPostgresMigrations above: a bare `throw` here would abort the whole
+  // wrapping transaction on rollback, undoing every savepoint-released step
+  // already committed earlier in *this same* rollback call, not just the one
+  // that failed. That would silently contradict this function's own
+  // documented guarantee ("a failed down script doesn't lose progress
+  // already made").
+  let failed: unknown = null;
+
+  await client.begin(async (tx) => {
+    await tx.unsafe("SELECT pg_advisory_xact_lock($1)", [MIGRATION_LOCK_KEY]);
+
+    let rows: { name: string }[];
+    try {
+      rows = (await tx.unsafe("SELECT name FROM _x_migrations")) as { name: string }[];
+    } catch {
+      // No bookkeeping table yet -- nothing has ever been applied.
+      return;
+    }
+
+    const appliedNames = rows
+      .map((r) => r.name)
+      .sort(compareMigrationNames)
+      .reverse();
+
+    let seq = 0;
+    for (const name of appliedNames) {
+      if (result.rolledBack.length >= steps) break;
+
+      const downFile = toDownFileName(name);
+      const downPath = join(migrationsDir, downFile);
+      if (!existsSync(downPath)) {
+        console.warn(
+          `[x] no down migration for "${name}" (expected "${downFile}") -- stopping rollback here`,
+        );
+        result.skipped.push(name);
+        break;
+      }
+
+      const sql = readFileSync(downPath, "utf-8");
+      const savepoint = `x_rollback_${seq++}`;
+      await tx.unsafe(`SAVEPOINT ${savepoint}`);
+      try {
+        await tx.unsafe(sql);
+        await tx.unsafe("DELETE FROM _x_migrations WHERE name = $1", [name]);
+        await tx.unsafe(`RELEASE SAVEPOINT ${savepoint}`);
+        console.log(`[x] migration rolled back: ${name}`);
+        result.rolledBack.push(name);
+      } catch (err) {
+        await tx.unsafe(`ROLLBACK TO SAVEPOINT ${savepoint}`).catch(() => {});
+        await tx.unsafe(`RELEASE SAVEPOINT ${savepoint}`).catch(() => {});
+        failed = err;
+        break;
+      }
+    }
+  });
+
+  if (failed !== null) throw failed;
   return result;
 }

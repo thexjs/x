@@ -11,6 +11,7 @@
 import type { Database } from "bun:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   type AuthUser,
   createSQLiteSessionStore,
@@ -20,14 +21,21 @@ import {
 } from "@thexjs/auth";
 import { connectSQLite, runSQLiteMigrations } from "@thexjs/core/data";
 
+// `import.meta.dir` is Bun-only -- it's `undefined` under plain Node, which
+// breaks this file once @thexjs/adapter-node or @thexjs/adapter-vercel
+// transpile it for a Node runtime (Bun.build's `target: "node"` does not
+// polyfill it). `fileURLToPath(new URL(".", import.meta.url))` resolves to
+// the same directory on both Bun and Node.
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+
 let db: Database | null = null;
 
 function getDb(): Database {
   if (db) return db;
-  const dbPath = join(import.meta.dir, "..", "..", "data", "dev.db");
+  const dbPath = join(__dirname, "..", "..", "data", "dev.db");
   mkdirSync(dirname(dbPath), { recursive: true });
   db = connectSQLite({ path: dbPath });
-  runSQLiteMigrations(db, join(import.meta.dir, "migrations"));
+  runSQLiteMigrations(db, join(__dirname, "migrations"));
   return db;
 }
 
