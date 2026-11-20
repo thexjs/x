@@ -1,5 +1,24 @@
 # @thexjs/cli
 
+## 1.3.0
+
+### Minor Changes
+
+- 07ed0bd: Add down-migrations/rollback to the data layer and a CLI runner for it.
+
+  `@thexjs/core/data` gains `rollbackSQLiteMigrations` and `rollbackPostgresMigrations`: each rolls back up to N applied migrations (default 1), most-recently-applied first, by running an optional `*.down.sql` sibling of the up-migration file (e.g. `001_create_users.sql` / `001_create_users.down.sql`) and removing its `_x_migrations` bookkeeping row. A migration with no down file can't be reverted, so rollback stops there instead of silently skipping past it. Existing migrations with no down file keep working exactly as before.
+
+  `@thexjs/cli` adds `x migrate down [N]`, rolling back against SQLite (`--sqlite <path>`, default `data/dev.db`) or Postgres (`--postgres`, or automatically when `DATABASE_URL` is set), reading migrations from `--dir <path>` (default `src/lib/migrations`).
+- 8c77122: Add a `Reporter` abstraction (`packages/cli/src/reporter.ts`) that every CLI command path now routes through instead of calling `console.log` ad hoc. `x dev` prints a settled startup summary (local/network URL, route count, startup time) followed by live request lines; `x build` prints a step-by-step list with per-step timing ending in the existing `N static, N server, N api routes -> <dir>` summary; `x start` prints a single clean "production server running at `<url>`" line. ANSI colors are now automatically stripped when stdout isn't a TTY (piped to a file/tool) or `NO_COLOR` is set.
+
+  Adds a machine-readable mode: `--json` (or `--format json`) emits one JSON object per line (NDJSON) on stdout for events like `build:start`/`build:step`/`build:complete`, `dev:ready`/`dev:request`/`dev:rebuild`, and `start:ready`; errors go to stderr as `{"event":"...:error","message","stack"}`. Exit codes are unchanged — a failed build still fails. `--format text` is the default, human-readable mode; an unknown `--format` value fails with a clear error, matching the existing `--adapter` error style.
+
+### Patch Changes
+
+- Updated dependencies [a91bdd8]
+- Updated dependencies [07ed0bd]
+  - @thexjs/core@1.14.0
+
 ## 1.2.0
 
 ### Minor Changes

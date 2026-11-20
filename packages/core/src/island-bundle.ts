@@ -169,12 +169,18 @@ document.querySelectorAll("[data-island]").forEach(function(el) {
 `;
 }
 
+/**
+ * 64-bit hash (via `Bun.hash`), truncated to a fixed 16-hex-char length.
+ *
+ * Previously this was a hand-rolled 32-bit rolling hash, which gave two
+ * different route files a real (if small) chance of colliding on an app
+ * with many routes -- e.g. two different `index.tsx` files in different
+ * directories hashing to the same id and silently overwriting each other's
+ * compiled island bundle on disk. `Bun.hash`'s 64-bit output makes that
+ * collision astronomically unlikely at any realistic route count.
+ */
 export function hashId(str: string): string {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) {
-    h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
-  }
-  return Math.abs(h).toString(36);
+  return Bun.hash(str).toString(16).padStart(16, "0");
 }
 
 export function islandEntryId(routeFilePath: string): string {
