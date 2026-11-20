@@ -1,0 +1,38 @@
+# Fly.io reference deployment for x apps.
+#
+# This builds the same multi-stage root `Dockerfile` the "Docker" deployment
+# path in DEPLOY.md uses (Bun-based, `x build --outDir dist`), rather than
+# `@thexjs/adapter-node`'s Node.js output. Two reasons:
+#
+#   1. Fly runs whatever image a Dockerfile produces, so there's no
+#      Bun-vs-Node constraint to work around in the first place -- unlike a
+#      PaaS that only runs Node (Railway, Render), which is what
+#      `@thexjs/adapter-node` targets (see DEPLOY.md's "Deploy to a bare
+#      Node host" section).
+#   2. `examples/basic` (what this builds) uses `connectSQLite`
+#      (`@thexjs/core/data`), which wraps `bun:sqlite` and throws on boot
+#      under plain Node -- "connectSQLite requires the Bun runtime". The
+#      Bun-based image sidesteps that entirely; switching this example to
+#      the Node adapter would additionally require moving it to
+#      `connectPostgres` first.
+#
+# `fly launch --no-deploy` may offer to regenerate this file -- diff before
+# accepting, so `internal_port` stays in sync with the Dockerfile's
+# `EXPOSE 3000` / `CMD ["bun", "dist/server/index.ts"]`.
+app = "my-x-app"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  memory = "512mb"
+  cpu_kind = "shared"
+  cpus = 1

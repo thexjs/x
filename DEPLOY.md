@@ -3,6 +3,28 @@
 x apps deploy as a single server process with a static assets directory, no Node.js, no
 build-time server. Just `x build --outDir dist` + `bun dist/server/index.ts`.
 
+## Deployment targets at a glance
+
+`x` isn't tied to one host. `x build` defaults to a Bun-native output, but
+`--adapter <name>` swaps in a platform-specific build for anywhere that default
+doesn't fit:
+
+| Target                                 | How                                                         | Runtime at request time                           |
+| -------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------- |
+| Bun process (VPS, systemd, bare metal) | `x build --outDir dist` + `bun dist/server/index.ts`        | Bun                                               |
+| Docker / any OCI container             | root `Dockerfile` (Bun-based, multi-stage)                  | Bun                                               |
+| Fly.io                                 | committed `fly.toml` + the same root `Dockerfile`           | Bun                                               |
+| Vercel                                 | `x build --adapter vercel` (`@thexjs/adapter-vercel`)       | Node 20 (Vercel's own Build Output API functions) |
+| Railway / Render / a bare Node host    | `x build --adapter node` (`@thexjs/adapter-node`)           | plain Node.js, no Bun                             |
+| Something else                         | write your own adapter against `@thexjs/core/adapter`'s SDK | up to you                                         |
+
+None of these require rewriting app code to switch — the adapters compose the
+same build primitives (see "Writing your own adapter" below), and the two
+shipped adapters are themselves ordinary consumers of that SDK, not special
+cases wired into the core. See also the "Bring your own runtime" section in
+the root [README.md](./README.md) for the short version of why this matters
+for a solo-maintained project.
+
 ## Prerequisites
 
 - [Bun](https://bun.sh) 1.3.x or later (build + runtime)
@@ -107,29 +129,75 @@ default 3000). No separate static host or CDN tier is required, though you can
 still put one in front. See `packages/adapter-node/README.md` for the `trustProxy`
 option (only enable it behind a reverse proxy you control).
 
+> **SQLite apps need Postgres first.** `connectSQLite` (`@thexjs/core/data`)
+> wraps `bun:sqlite` and throws on boot under plain Node ("connectSQLite
+> requires the Bun runtime") -- it has no polyfill, by design. If your app
+> uses it (`examples/basic` and `examples/saas` both do, for their
+> credentials auth), switch to `connectPostgres` before building with
+> `--adapter node` (or `--adapter vercel`, which hits the same constraint).
+> Also watch for `import.meta.dir` in your own code -- it's a Bun-only
+> global that's `undefined` under Node; use
+> `fileURLToPath(new URL(".", import.meta.url))` instead if you need a
+> runtime-agnostic "this file's directory".
+
+## Writing your own adapter
+
+`@thexjs/adapter-vercel` and `@thexjs/adapter-node` aren't special-cased into
+the CLI's build pipeline -- they're both ordinary consumers of a
+platform-agnostic adapter SDK exported from `@thexjs/core/adapter`
+(`packages/core/src/adapter/`). A third adapter (Cloudflare, Netlify, a
+different Node host with its own packaging format, ...) composes the same
+four pieces:
+1. **`resolveBuildManifest(options, scratchDir)`** -- scans every
+   server-mode route, layout, middleware, and action file at build time into
+   a `BuildManifest`. This is what lets the output run somewhere that can't
+   scan the filesystem for `.tsx`/`.ts` routes at request time the way Bun
+   can.
+2. **`transpileModules(moduleRefs)`** -- compiles each referenced source file
+   from Bun-flavored TSX/TS into a standalone Node-runnable ESM module
+   (`react`, `react-dom`, and `@thexjs/core` stay external here so they're
+   inlined once, not per-route).
+3. **`generateAdapterEntry(manifest, entryDir)`** -- emits an entry module
+   that statically imports every compiled route/action and constructs the
+   real `createApp()` against the pre-resolved manifest (no dynamic
+   `import(path)`, no runtime fs walk).
+4. **`bundleRenderFunction(entryDir, outFile)`** -- inlines that entry plus
+   its whole dependency graph into one self-contained file.
+
+What differs per platform is everything _around_ those four calls: `@thexjs/adapter-node`
+adds a plain `node:http` static-file server in front and writes a flat
+`dist-node/` tree; `@thexjs/adapter-vercel` instead emits a Build Output API
+v3 tree (`config.json`, `static/`, `functions/render.func`) because that's
+what Vercel's routing layer expects. Read `packages/adapter-node/src/index.ts`
+and `packages/adapter-vercel/src/index.ts` side by side -- they diverge only
+in that output-shaping layer, not in how they get the server-mode code into a
+bundle. Wire a new adapter into the CLI by adding an `adapterName === "..."`
+branch next to the existing ones in `packages/cli/src/index.ts`'s `cmdBuild`
+(around the `"vercel"` and `"node"` branches), which dynamically imports your
+package the same way.
+
 ## Deploy to Fly.io
 
+A reference deployment is committed at the repo root: [`fly.toml`](./fly.toml).
+It builds the same multi-stage `Dockerfile` the "Docker" section above uses
+(Bun-based), not `@thexjs/adapter-node`'s output -- `examples/basic`'s SQLite
+auth needs Bun at runtime (see the caveat above), and Fly runs an arbitrary
+container anyway, so there's no Node-only constraint to route around here the
+way there is on Railway/Render.
 1. Install the [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/)
-2. Create a `fly.toml`:
-
-```toml
-app = "my-x-app"
-primary_region = "iad"
-
-[build]
-  dockerfile = "Dockerfile"
-
-[http_service]
-  internal_port = 3000
-  force_https = true
-```
-
+2. Review `fly.toml` -- at minimum change `app` to a name you own
 3. Launch:
 
 ```sh
 fly launch --no-deploy
 fly deploy
 ```
+
+> `fly launch` may offer to regenerate `fly.toml` for you. If you accept, diff
+> the result against the committed one -- `internal_port` (`http_service`)
+> needs to stay `3000` to match the Dockerfile's `EXPOSE`/`CMD`.
+> `scripts/fly-toml.test.ts` checks that invariant in CI so it can't drift
+> silently.
 
 ## Deploy to a VPS
 
