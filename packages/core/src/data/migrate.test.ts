@@ -2,7 +2,12 @@ import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { runPostgresMigrations, runSQLiteMigrations } from "./migrate";
+import {
+  rollbackPostgresMigrations,
+  rollbackSQLiteMigrations,
+  runPostgresMigrations,
+  runSQLiteMigrations,
+} from "./migrate";
 import { connectPostgres, type PostgresClient } from "./postgres";
 
 const FIXTURE_DIR = join(import.meta.dir, "__fixtures__/migrations");
@@ -26,8 +31,12 @@ function writeMigration(name: string, sql: string) {
 function tableExists(db: Database, name: string): boolean {
   const row = db
     .query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?1")
-    .get(name) as { name: string } | undefined;
-  return row !== undefined;
+    .get(name) as { name: string } | null;
+  // bun:sqlite's `.get()` returns `null` (not `undefined`) for no match --
+  // rollback tests below are the first callers that hit the "doesn't exist"
+  // branch, so `!== undefined` (which is always true against `null`) never
+  // got exercised before.
+  return row !== null;
 }
 
 function appliedNames(db: Database): string[] {
@@ -237,6 +246,112 @@ describe("runSQLiteMigrations", () => {
     expect(second.skipped).toEqual(["001_create_users.sql"]);
     expect(second.drifted).toEqual([]);
     expect(second.unknownContent).toEqual([]);
+    db.close();
+  });
+});
+
+describe("rollbackSQLiteMigrations", () => {
+  test("rolling back an applied migration actually reverts the schema", () => {
+    resetFixtures();
+    writeMigration("001_create_users.sql", "CREATE TABLE users (id INTEGER PRIMARY KEY);");
+    writeMigration("001_create_users.down.sql", "DROP TABLE users;");
+
+    const db = new Database(":memory:");
+    runSQLiteMigrations(db, FIXTURE_DIR);
+    expect(tableExists(db, "users")).toBe(true);
+
+    const result = rollbackSQLiteMigrations(db, FIXTURE_DIR);
+    expect(result.rolledBack).toEqual(["001_create_users.sql"]);
+    expect(result.skipped).toEqual([]);
+    // The table is actually gone -- not just "the function returned".
+    expect(tableExists(db, "users")).toBe(false);
+    expect(appliedNames(db)).toEqual([]);
+    db.close();
+  });
+
+  test("rolls back multiple steps in reverse-applied order", () => {
+    resetFixtures();
+    writeMigration("001_create_users.sql", "CREATE TABLE users (id INTEGER PRIMARY KEY);");
+    writeMigration("001_create_users.down.sql", "DROP TABLE users;");
+    writeMigration(
+      "002_add_profiles.sql",
+      "CREATE TABLE profiles (id INTEGER PRIMARY KEY, user_id INTEGER);",
+    );
+    writeMigration("002_add_profiles.down.sql", "DROP TABLE profiles;");
+
+    const db = new Database(":memory:");
+    runSQLiteMigrations(db, FIXTURE_DIR);
+
+    const result = rollbackSQLiteMigrations(db, FIXTURE_DIR, 2);
+    expect(result.rolledBack).toEqual(["002_add_profiles.sql", "001_create_users.sql"]);
+    expect(tableExists(db, "users")).toBe(false);
+    expect(tableExists(db, "profiles")).toBe(false);
+    expect(appliedNames(db)).toEqual([]);
+    db.close();
+  });
+
+  test("stops (no-op with a warning) at a migration with no down file, instead of silently skipping it", () => {
+    resetFixtures();
+    writeMigration("001_create_users.sql", "CREATE TABLE users (id INTEGER PRIMARY KEY);");
+    // No "001_create_users.down.sql" -- this migration can't be reverted.
+    writeMigration(
+      "002_add_profiles.sql",
+      "CREATE TABLE profiles (id INTEGER PRIMARY KEY, user_id INTEGER);",
+    );
+    writeMigration("002_add_profiles.down.sql", "DROP TABLE profiles;");
+
+    const db = new Database(":memory:");
+    runSQLiteMigrations(db, FIXTURE_DIR);
+
+    // Ask to roll back both, but 001 has no down file: 002 rolls back, then
+    // rollback stops instead of silently leaving 001 unreverted-but-dropped.
+    const result = rollbackSQLiteMigrations(db, FIXTURE_DIR, 2);
+    expect(result.rolledBack).toEqual(["002_add_profiles.sql"]);
+    expect(result.skipped).toEqual(["001_create_users.sql"]);
+    expect(tableExists(db, "profiles")).toBe(false);
+    // 001 is untouched: table still there, bookkeeping row still there.
+    expect(tableExists(db, "users")).toBe(true);
+    expect(appliedNames(db)).toEqual(["001_create_users.sql"]);
+    db.close();
+  });
+
+  test("a down-migration file is never picked up as its own up migration", () => {
+    resetFixtures();
+    writeMigration("001_create_users.sql", "CREATE TABLE users (id INTEGER PRIMARY KEY);");
+    writeMigration("001_create_users.down.sql", "DROP TABLE users;");
+
+    const db = new Database(":memory:");
+    const result = runSQLiteMigrations(db, FIXTURE_DIR);
+    expect(result.applied).toEqual(["001_create_users.sql"]);
+    db.close();
+  });
+
+  test("defaults to rolling back exactly one step", () => {
+    resetFixtures();
+    writeMigration("001_create_users.sql", "CREATE TABLE users (id INTEGER PRIMARY KEY);");
+    writeMigration("001_create_users.down.sql", "DROP TABLE users;");
+    writeMigration(
+      "002_add_profiles.sql",
+      "CREATE TABLE profiles (id INTEGER PRIMARY KEY, user_id INTEGER);",
+    );
+    writeMigration("002_add_profiles.down.sql", "DROP TABLE profiles;");
+
+    const db = new Database(":memory:");
+    runSQLiteMigrations(db, FIXTURE_DIR);
+
+    const result = rollbackSQLiteMigrations(db, FIXTURE_DIR);
+    expect(result.rolledBack).toEqual(["002_add_profiles.sql"]);
+    expect(tableExists(db, "profiles")).toBe(false);
+    expect(tableExists(db, "users")).toBe(true);
+    db.close();
+  });
+
+  test("rolling back with nothing applied is a no-op", () => {
+    resetFixtures();
+    const db = new Database(":memory:");
+    const result = rollbackSQLiteMigrations(db, FIXTURE_DIR);
+    expect(result.rolledBack).toEqual([]);
+    expect(result.skipped).toEqual([]);
     db.close();
   });
 });
@@ -459,6 +574,67 @@ describe.if(Boolean(PG_TEST_URL))("runPostgresMigrations", () => {
       expect(result.unknownContent).toEqual(["001_legacy.sql"]);
       expect(result.skipped).toEqual(["001_legacy.sql"]);
       expect(result.drifted).toEqual([]);
+    });
+  });
+
+  test("rolling back an applied migration actually reverts the schema", async () => {
+    resetFixtures();
+    writeMigration("001_create_users.sql", "CREATE TABLE users (id SERIAL PRIMARY KEY);");
+    writeMigration("001_create_users.down.sql", "DROP TABLE users;");
+
+    await withDatabase(async (client) => {
+      await runPostgresMigrations(client, FIXTURE_DIR);
+      expect(await tableExists(client, "users")).toBe(true);
+
+      const result = await rollbackPostgresMigrations(client, FIXTURE_DIR);
+      expect(result.rolledBack).toEqual(["001_create_users.sql"]);
+      expect(result.skipped).toEqual([]);
+      // The table is actually gone -- not just "the function returned".
+      expect(await tableExists(client, "users")).toBe(false);
+      expect(await appliedNames(client)).toEqual([]);
+    });
+  });
+
+  test("rolls back multiple steps in reverse-applied order", async () => {
+    resetFixtures();
+    writeMigration("001_create_users.sql", "CREATE TABLE users (id SERIAL PRIMARY KEY);");
+    writeMigration("001_create_users.down.sql", "DROP TABLE users;");
+    writeMigration(
+      "002_add_profiles.sql",
+      "CREATE TABLE profiles (id SERIAL PRIMARY KEY, user_id INTEGER);",
+    );
+    writeMigration("002_add_profiles.down.sql", "DROP TABLE profiles;");
+
+    await withDatabase(async (client) => {
+      await runPostgresMigrations(client, FIXTURE_DIR);
+
+      const result = await rollbackPostgresMigrations(client, FIXTURE_DIR, 2);
+      expect(result.rolledBack).toEqual(["002_add_profiles.sql", "001_create_users.sql"]);
+      expect(await tableExists(client, "users")).toBe(false);
+      expect(await tableExists(client, "profiles")).toBe(false);
+      expect(await appliedNames(client)).toEqual([]);
+    });
+  });
+
+  test("stops at a migration with no down file instead of silently skipping it", async () => {
+    resetFixtures();
+    writeMigration("001_create_users.sql", "CREATE TABLE users (id SERIAL PRIMARY KEY);");
+    // No "001_create_users.down.sql" -- this migration can't be reverted.
+    writeMigration(
+      "002_add_profiles.sql",
+      "CREATE TABLE profiles (id SERIAL PRIMARY KEY, user_id INTEGER);",
+    );
+    writeMigration("002_add_profiles.down.sql", "DROP TABLE profiles;");
+
+    await withDatabase(async (client) => {
+      await runPostgresMigrations(client, FIXTURE_DIR);
+
+      const result = await rollbackPostgresMigrations(client, FIXTURE_DIR, 2);
+      expect(result.rolledBack).toEqual(["002_add_profiles.sql"]);
+      expect(result.skipped).toEqual(["001_create_users.sql"]);
+      expect(await tableExists(client, "profiles")).toBe(false);
+      expect(await tableExists(client, "users")).toBe(true);
+      expect(await appliedNames(client)).toEqual(["001_create_users.sql"]);
     });
   });
 });
