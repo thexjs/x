@@ -7,19 +7,14 @@ export const LIVE_RELOAD_SCRIPT = `
   var delay = INITIAL_DELAY;
   var hadError = false;
 
-  function reload() {
-    if (typeof window.__xSoftReload === "function") {
-      window.__xSoftReload();
-    } else {
-      if (timer !== null) {
-        clearTimeout(timer);
-        timer = null;
-      }
-      if (es) {
-        es.close();
-        es = null;
-      }
-      window.location.reload();
+  function closeCurrent() {
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    if (es) {
+      es.close();
+      es = null;
     }
   }
 
@@ -45,12 +40,18 @@ export const LIVE_RELOAD_SCRIPT = `
       delay = INITIAL_DELAY;
       if (hadError) {
         hadError = false;
-        reload();
+        closeCurrent();
+        window.location.reload();
       }
     };
     current.addEventListener("reload", function () {
       if (es !== current) return;
-      reload();
+      closeCurrent();
+      if (typeof window.__xSoftReload === "function") {
+        window.__xSoftReload();
+      } else {
+        window.location.reload();
+      }
     });
     current.addEventListener("hb", function () {});
     current.onerror = function () {
