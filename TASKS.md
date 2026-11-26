@@ -8,6 +8,7 @@ bundler/dev-server stack, `Bun.serve()` + Bun's built-in bundler do that job nat
 ## Progress so far
 
 Working end to end, tested with `bun test`, typechecked, linted clean:
+
 - File-based router (`packages/core/src/router.ts`): static, `[param]`, and
   `[...catchall]` files converted to `Bun.serve()` route patterns
 - Naive SSR (`packages/core/src/render.ts` + `createApp.ts`): every route is
@@ -49,90 +50,90 @@ verified, not just written.
 ## Phase 1: File-based router
 
 - [x] Route conventions: `src/routes/index.tsx`, `src/routes/[id].tsx`,
-  `src/routes/[...slug].tsx`
+      `src/routes/[...slug].tsx`
 - [x] Route scanner: walk `src/routes`, build an in-memory route tree
-  (currently `node:fs` recursion: swap for `Bun.Glob` if it turns out cleaner)
+      (currently `node:fs` recursion: swap for `Bun.Glob` if it turns out cleaner)
 - [x] Map route tree → `Bun.serve()`'s `routes` object (exact paths, `:param`,
-  `*` catch-all): covered by `router.test.ts`
+      `*` catch-all): covered by `router.test.ts`
 - [x] Generate a typed route manifest (params typed per route, not just
-  `Record<string, string>`)
-  : `createApp` writes `src/x-routes.ts` in dev mode with a `RouteMap` type
-  and a type-safe `href()` helper
+      `Record<string, string>`)
+      : `createApp` writes `src/x-routes.ts` in dev mode with a `RouteMap` type
+      and a type-safe `href()` helper
 - [x] Nested layouts: wrap a page in its ancestor `_layout.tsx` chain
-  (`_` prefix is already reserved and skipped by the scanner, just unused)
-  : `scanLayouts` discovers `_layout.tsx` files, `findLayoutChain` builds the
-  ancestor chain for each route, and `createApp` wraps the page component
-  from innermost to outermost layout
+      (`_` prefix is already reserved and skipped by the scanner, just unused)
+      : `scanLayouts` discovers `_layout.tsx` files, `findLayoutChain` builds the
+      ancestor chain for each route, and `createApp` wraps the page component
+      from innermost to outermost layout
 - [x] File watcher rebuilds the route tree on add/remove without a full
-  server restart (`--hot` reloads changed route _content_ today, not new
-  route _files_)
-  : `fs.watch` with `recursive: true` on the routes directory triggers a
-  route-tree rebuild (debounced 200 ms) and logs added/removed routes
+      server restart (`--hot` reloads changed route _content_ today, not new
+      route _files_)
+      : `fs.watch` with `recursive: true` on the routes directory triggers a
+      route-tree rebuild (debounced 200 ms) and logs added/removed routes
 
 ## Phase 2: Static rendering + islands (the Astro half)
 
 - [x] `export const mode = 'static'` on a route → prerendered at build time
-  : `build()` reads the `mode` export; static routes are rendered with
-  `renderToStaticMarkup` and written to `dist/client/`
+      : `build()` reads the `mode` export; static routes are rendered with
+      `renderToStaticMarkup` and written to `dist/client/`
 - [x] Static build step: render each static route with `renderToStaticMarkup`,
-  write to `dist/`
-  : `packages/core/src/build.ts` includes `build()` that runs the full
-  static-export pipeline
+      write to `dist/`
+      : `packages/core/src/build.ts` includes `build()` that runs the full
+      static-export pipeline
 - [x] Content collections: `content/**/*.md(x)`, frontmatter parsing, each entry
-  becomes a route (this is the blog/marketing use case)
-  : `scanContent()` discovers markdown files, parses basic frontmatter,
-  maps file paths to routes; served in dev mode via `contentDir` option,
-  built to static HTML in `build()`
+      becomes a route (this is the blog/marketing use case)
+      : `scanContent()` discovers markdown files, parses basic frontmatter,
+      maps file paths to routes; served in dev mode via `contentDir` option,
+      built to static HTML in `build()`
 - [x] Island marker (`<Island client="idle">` or similar): only marked components
-  get a client JS bundle; everything else ships as plain HTML
-  : `<Island>` component wraps children in `data-island` divs;
-  `IslandProvider` collects island entries during render; build generates
-  a stub JS chunk per island (real hydration module loading is next)
+      get a client JS bundle; everything else ships as plain HTML
+      : `<Island>` component wraps children in `data-island` divs;
+      `IslandProvider` collects island entries during render; build generates
+      a stub JS chunk per island (real hydration module loading is next)
 - [x] Verify Bun's bundler code-splits each island into its own small chunk
-  : `bundleRouteIslands()` in `build.ts` generates a client entry per route
-  that imports the route module and hydrates all `[data-island]` elements;
-  runs `bun build` (via `Bun.spawn`) as a child process to produce a
-  separate minified JS bundle per route's islands; bundle URL is injected
-  into the page HTML via `<script type="module">` tags.
-  Verified in `build.test.ts`: "island code-splitting" tests confirm
-  separate JS chunks exist in `dist/client/_islands/`, HTML contains the
-  script tag, and bundled output is valid JavaScript.
+      : `bundleRouteIslands()` in `build.ts` generates a client entry per route
+      that imports the route module and hydrates all `[data-island]` elements;
+      runs `bun build` (via `Bun.spawn`) as a child process to produce a
+      separate minified JS bundle per route's islands; bundle URL is injected
+      into the page HTML via `<script type="module">` tags.
+      Verified in `build.test.ts`: "island code-splitting" tests confirm
+      separate JS chunks exist in `dist/client/_islands/`, HTML contains the
+      script tag, and bundled output is valid JavaScript.
 
 ## Phase 3: SSR + server functions (the Next.js half)
 
 - [x] `export const mode = 'server'`: dynamically rendered server-side (Phase 2
-  `static` mode exists alongside it)
+      `static` mode exists alongside it)
 - [x] `renderToReadableStream` streaming through the `Bun.serve` fetch handler —
-  `renderStreamingPage()` in `render.ts`, server-mode routes stream HTML instead
-  of blocking on full render
+      `renderStreamingPage()` in `render.ts`, server-mode routes stream HTML instead
+      of blocking on full render
 - [x] `loader()` convention: async function co-located with the route, runs
-  server-side before render, data passed as `loaderData: Record<string, unknown>`
-  in `RouteProps`
+      server-side before render, data passed as `loaderData: Record<string, unknown>`
+      in `RouteProps`
 - [x] `src/routes/api/*.ts` → per-method handlers (`GET`/`POST`/`PATCH`/`DELETE`),
-  scanned with `isApi` flag, dispatched by method
+      scanned with `isApi` flag, dispatched by method
 - [x] Typed server functions: any async named export from a route module is
-  served as an RPC endpoint at `/__x/actions/<routePath>/<fnName>`;
-  `generateServerFunctionClient()` produces typed fetch wrappers
+      served as an RPC endpoint at `/__x/actions/<routePath>/<fnName>`;
+      `generateServerFunctionClient()` produces typed fetch wrappers
 - [x] Middleware: `_middleware.ts` files alongside routes, composed in onion
-  pattern with `composeMiddleware()`, supports short-circuit
+      pattern with `composeMiddleware()`, supports short-circuit
 - [x] Revalidation (ISR-equivalent): static routes with `export const revalidate = <seconds>` are
-  served from an in-memory cache that auto-expires after the TTL; `POST /__x/revalidate`
-  with `{ path: "/..." }` busts individual entries or clears all caches (no body path)
+      served from an in-memory cache that auto-expires after the TTL; `POST /__x/revalidate`
+      with `{ path: "/..." }` busts individual entries or clears all caches (no body path)
 
 ## Phase 4: Dev server
 
 - [x] Proper island hydration bundles: `bundleRouteIslands()` generates a real
-  client JS bundle per route (via `bun build --target=browser`) that imports the
-  route module, looks up `data-island` elements, and hydrates each with
-  `hydrateRoot()`
+      client JS bundle per route (via `bun build --target=browser`) that imports the
+      route module, looks up `data-island` elements, and hydrates each with
+      `hydrateRoot()`
 - [x] Server-side render errors surface in the browser overlay: `renderErrorOverlay()`
-  in `error-overlay.ts` renders a styled HTML error page; all route/API handlers
-  in `createApp.ts` are wrapped in try/catch and return the overlay in dev mode
+      in `error-overlay.ts` renders a styled HTML error page; all route/API handlers
+      in `createApp.ts` are wrapped in try/catch and return the overlay in dev mode
 
 ## Phase 5: Production build
 
 - [x] `x build` → runs `build()` from `@thexjs/core`, then `bun build --target=bun` on the
-  generated server entry (bundled in `build.ts` via `Bun.spawnSync`)
+      generated server entry (bundled in `build.ts` via `Bun.spawnSync`)
 - [x] Fully-static routes get a separate static-export output (`dist/client/`)
 - [x] `Dockerfile` using `oven/bun` base image (multi-stage: build then production)
 - [x] `DEPLOY.md`: deployment notes for Fly.io, VPS + systemd, environment variables
@@ -140,30 +141,30 @@ verified, not just written.
 ## Phase 6: Data layer
 
 - [x] Thin helpers over Bun's built-in SQLite client for local dev
-  : `packages/core/src/data/sqlite.ts`: `connectSQLite()` wraps `bun:sqlite`
-  with WAL mode and foreign keys enabled by default
+      : `packages/core/src/data/sqlite.ts`: `connectSQLite()` wraps `bun:sqlite`
+      with WAL mode and foreign keys enabled by default
 - [x] Same helpers over Bun's Postgres client for anything meant to ship
-  : `packages/core/src/data/postgres.ts`: `connectPostgres()` wraps `Bun.sql()`
-  with `DATABASE_URL` env var fallback
+      : `packages/core/src/data/postgres.ts`: `connectPostgres()` wraps `Bun.sql()`
+      with `DATABASE_URL` env var fallback
 - [x] Pick one migration approach and write it down
-  : `packages/core/src/data/migrate.ts`: `runSQLiteMigrations()` and
-  `runPostgresMigrations()` run `.sql` files sorted by name, tracked in a
-  `_x_migrations` table (applied once, skipped on re-run)
+      : `packages/core/src/data/migrate.ts`: `runSQLiteMigrations()` and
+      `runPostgresMigrations()` run `.sql` files sorted by name, tracked in a
+      `_x_migrations` table (applied once, skipped on re-run)
 - [x] One auth/session example using the above
-  : `examples/basic/src/data/auth.ts`: session CRUD backed by SQLite + migrations
-  : `examples/basic/src/routes/dashboard/_middleware.ts`: redirects to `/login`
-  when session cookie is missing
-  : `examples/basic/src/routes/api/auth/login.ts`: POST handler validates
-  credentials (demo: admin/admin) and sets session cookie
-  : `examples/basic/src/routes/api/auth/logout.ts`: POST handler clears session
-  : `examples/basic/src/routes/login.tsx`: login form page (JS-free, plain HTML)
+      : `examples/basic/src/data/auth.ts`: session CRUD backed by SQLite + migrations
+      : `examples/basic/src/routes/dashboard/_middleware.ts`: redirects to `/login`
+      when session cookie is missing
+      : `examples/basic/src/routes/api/auth/login.ts`: POST handler validates
+      credentials (demo: admin/admin) and sets session cookie
+      : `examples/basic/src/routes/api/auth/logout.ts`: POST handler clears session
+      : `examples/basic/src/routes/login.tsx`: login form page (JS-free, plain HTML)
 
 ## Phase 7: Prove the pitch
 
 - [x] Build one real app end to end: marketing/blog (static + content
-  collections) plus a dashboard (SSR + server functions + auth) in the same
-  project
-  : `examples/basic` now includes:
+      collections) plus a dashboard (SSR + server functions + auth) in the same
+      project
+      : `examples/basic` now includes:
   - Marketing/blog: `/about` (static), `/blog` (server-rendered listing with
     `loader`), `/blog/hello` (content collection entry), `/posts/:id`
     (dynamic SSR route)
@@ -171,10 +172,10 @@ verified, not just written.
     - Auth: login page, session middleware, login/logout API routes, SQLite
       session storage with migrations
 - [x] Benchmark against a plain Next.js app and a plain Astro app: cold dev
-  server start, HMR round-trip, build time, Lighthouse score on the static
-  page, TTFB on the SSR page
-  : `bench.sh` measures cold start, TTFB for static and SSR pages, and build
-  time against the example app
+      server start, HMR round-trip, build time, Lighthouse score on the static
+      page, TTFB on the SSR page
+      : `bench.sh` measures cold start, TTFB for static and SSR pages, and build
+      time against the example app
 
 ## Explicitly not doing yet
 

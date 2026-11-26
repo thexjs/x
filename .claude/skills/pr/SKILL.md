@@ -40,6 +40,7 @@ Skip all preambles and keep prose brief. Use the user's domain language from `GL
 ### Summary
 
 Pick the smallest view that makes the key point clear.
+
 - Show logic or an algorithm as pseudocode:
 
 ```text

@@ -35,6 +35,7 @@ package's own `package.json` or npm listing for the live version.
 
 A change is **breaking (major)** if it requires a consumer to change code or
 config to keep working after upgrading:
+
 - Removing or renaming an exported API (`createApp`, `defineAuth`, ...) or a
   public type.
 - Changing a function's signature in a way that breaks existing callers
@@ -54,6 +55,7 @@ option) are `minor`.
 ## Deprecation window
 
 Public API is removed in stages so consumers can upgrade without a cliff:
+
 1. **Deprecation** — the export is marked `@deprecated` in its JSDoc and, where
    practical, logs a warning pointing at the replacement. Deprecated in
    version `N`.
@@ -70,6 +72,7 @@ not public API and can change at any time.
 ## Pre-releases (canary / next)
 
 Pre-release tags follow Changesets' `pre` mode:
+
 - `x version` runs with a `pre` tag of `next` for `@thexjs/*@next`, `canary`
   for `@thexjs/*@canary`. Pre-release version numbers are valid semver
   (e.g. `1.5.0-next.0`).
@@ -82,6 +85,7 @@ Pre-release tags follow Changesets' `pre` mode:
 ## The release flow (summary)
 
 `CONTRIBUTING.md#releasing` has the operational details. In short:
+
 1. Every PR touching `packages/*` adds a changeset (CI enforces this).
 2. Merge to `main` triggers `.github/workflows/release.yml`, which opens a
    "Version Packages" PR (bumps + changelogs).

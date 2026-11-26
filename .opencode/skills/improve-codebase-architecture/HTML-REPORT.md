@@ -42,6 +42,7 @@ Repo name, date, and a compact legend: solid box = module, dashed line = seam, r
 The diagrams carry the weight. Prose is sparse, plain, and uses the glossary terms (from the `/codebase-design` skill) without ceremony.
 
 Each candidate is one `<article>`:
+
 - **Title**: short, names the deepening (e.g. "Collapse the Order intake pipeline").
 - **Badge row**: recommendation strength (`Strong` = emerald, `Worth exploring` = amber, `Speculative` = slate), plus a tag for the dependency category (`in-process`, `local-substitutable`, `ports & adapters`, `mock`).
 - **Files**: monospaced list, `font-mono text-sm`.
@@ -111,6 +112,7 @@ Plain English, concise, but the architectural nouns and verbs come straight from
 **Never substitute:** component, service, unit (for module) · API, signature (for interface) · boundary (for seam) · layer, wrapper (for module, when you mean module).
 
 **Phrasings that fit the style:**
+
 - "Order intake module is shallow: interface nearly matches the implementation."
 - "Pricing leaks across the seam."
 - "Deepen: one interface, one place to test."

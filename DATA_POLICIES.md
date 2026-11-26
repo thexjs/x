@@ -38,6 +38,7 @@ the floor to implement.
 ## Inherited policy for apps built on x
 
 If your app stores personal data, implement at minimum:
+
 1. **Retention limits** — a documented maximum retention window per data class
    (e.g. sessions: 30 days inactive; account data: as long as the account
    exists; audit data: per regulatory requirement). Enforce with a scheduled
