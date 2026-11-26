@@ -55,6 +55,7 @@ import {
   rateLimitMiddleware,
 } from "./security/rate-limit";
 import { configureTrustedProxy } from "./security/trusted-proxy";
+import type { GenerateSeo, SeoConfig, SeoData } from "./seo";
 import {
   getServerFunctionHandler,
   registerServerFunctions,
@@ -79,6 +80,12 @@ export interface CreateAppOptions {
   actionsDir?: string;
   port?: number;
   development?: boolean;
+  /**
+   * sitemap.xml/robots.txt generation. Consumed by `x build`, not this
+   * dev/prod server directly -- present here so `defineConfig({ seo: ... })`
+   * type-checks in `x.config.ts`. See `SeoConfig` in `./seo`.
+   */
+  seo?: SeoConfig;
   /**
    * Resolved stylesheet <link> href (e.g. "/styles.css"), precomputed by the
    * build. Runtimes that can't check the filesystem at request time (Vercel's
@@ -318,6 +325,22 @@ function wrapWithLayouts(
   return content;
 }
 
+/**
+ * Resolves a page's SEO data for one request: `generateSeo` (computed from
+ * this request's params/loaderData -- a dynamic route like `/blog/[slug]`
+ * needs this to title the page from the post it loaded) takes precedence
+ * over a static `seo` export when both are present.
+ */
+async function resolveSeo(
+  seo: SeoData | undefined,
+  generateSeo: GenerateSeo | undefined,
+  params: Record<string, string>,
+  loaderData: Record<string, unknown>,
+): Promise<SeoData | undefined> {
+  if (generateSeo) return generateSeo({ params, loaderData });
+  return seo;
+}
+
 function renderContentPage(
   content: ContentEntry,
   stylesheet: string | undefined,
@@ -340,6 +363,7 @@ function renderContentPage(
     ),
     {
       title,
+      seo: { title, description: content.frontmatter.description as string | undefined },
       stylesheet,
       liveReload: dev,
       ...(nonce ? { cspNonce: nonce } : {}),
@@ -480,6 +504,7 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
     const cspNonce = generateCspNonce();
     const html = renderPage(content, {
       title: "404 — Not Found",
+      seo: { robots: "noindex" },
       stylesheet: stylesheetHref,
       liveReload: dev,
       cspNonce,
@@ -531,6 +556,8 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
     mode: RouteMode;
     revalidate: number | undefined;
     loader: ((args: LoaderArgs) => Promise<LoaderReturn>) | undefined;
+    seo: SeoData | undefined;
+    generateSeo: GenerateSeo | undefined;
     Component: ComponentType<RouteProps>;
     layoutModules: ComponentType<{ children: ReactNode }>[];
     layoutFilePaths: string[];
@@ -542,6 +569,8 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
       mode,
       revalidate,
       loader,
+      seo,
+      generateSeo,
       Component,
       layoutModules,
       layoutFilePaths,
@@ -568,6 +597,7 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
               if (result instanceof Response) return result;
               loaderData = result;
             }
+            const resolvedSeo = await resolveSeo(seo, generateSeo, ctx.params, loaderData);
             const registry = createIslandRegistry();
             const content = createElement(
               IslandProvider,
@@ -582,6 +612,7 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
               () =>
                 renderStreamingPage(content, {
                   stylesheet: stylesheetHref,
+                  seo: resolvedSeo,
                   liveReload: dev,
                   cspNonce,
                   ...(islandScripts === undefined
@@ -644,6 +675,7 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
               loaderData = result;
             }
 
+            const resolvedSeo = await resolveSeo(seo, generateSeo, ctx.params, loaderData);
             const registry = createIslandRegistry();
             const content = createElement(
               IslandProvider,
@@ -657,6 +689,7 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
               () =>
                 renderPageOnce(content, {
                   stylesheet: stylesheetHref,
+                  seo: resolvedSeo,
                   liveReload: dev,
                   cspNonce,
                   ...(islandScripts === undefined
@@ -770,6 +803,8 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
             mode: p.mode,
             revalidate: p.revalidate,
             loader: p.module.loader as ((args: LoaderArgs) => Promise<LoaderReturn>) | undefined,
+            seo: p.module.seo as SeoData | undefined,
+            generateSeo: p.module.generateSeo as GenerateSeo | undefined,
             Component,
             layoutModules: p.layoutModules,
             layoutFilePaths: p.layoutFilePaths ?? [],
@@ -922,6 +957,8 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
       const loader = mod.loader as ((args: LoaderArgs) => Promise<LoaderReturn>) | undefined;
       const routeMiddleware = mod.middleware as MiddlewareFn | undefined;
       const revalidate = mod.revalidate as number | undefined;
+      const seo = mod.seo as SeoData | undefined;
+      const generateSeo = mod.generateSeo as GenerateSeo | undefined;
 
       const layoutChain = findLayoutChain(route.filePath, layouts, pagesDir);
       // Prepend root layouts from the dedicated layouts dir
@@ -962,6 +999,8 @@ export async function createApp(options: CreateAppOptions): Promise<AppServeOpti
           mode,
           revalidate,
           loader,
+          seo,
+          generateSeo,
           Component,
           layoutModules,
           layoutFilePaths,
