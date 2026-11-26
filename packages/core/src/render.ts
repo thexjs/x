@@ -2,9 +2,17 @@ import type { ReactNode } from "react";
 import { renderToReadableStream, renderToStaticMarkup, renderToString } from "react-dom/server";
 import { CLIENT_NAV_SCRIPT } from "./client-nav";
 import { LIVE_RELOAD_SCRIPT } from "./live-reload";
+import { buildSeoHeadTags, type SeoData } from "./seo";
 
 export interface RenderOptions {
   title?: string;
+  /**
+   * Per-page SEO: meta description, canonical, Open Graph, Twitter card,
+   * JSON-LD. `seo.title`, when set, wins over `title` for the page's
+   * `<title>` tag -- both exist because `title` predates this and plenty of
+   * call sites (the 404 page, content pages) only ever need a bare string.
+   */
+  seo?: SeoData | undefined;
   islandScripts?: string[];
   islandProps?: Record<string, string>;
   /** Path to a stylesheet to <link> in <head>, e.g. "/styles.css". */
@@ -54,8 +62,11 @@ function escapeJsonForScript(s: string): string {
   return s.replace(/<\//g, "<\\/");
 }
 
-function buildHeadExtras(stylesheet: string | undefined): string {
-  return stylesheet ? `\n    <link rel="stylesheet" href="${escapeHtml(stylesheet)}" />` : "";
+function buildHeadExtras(stylesheet: string | undefined, seo: SeoData | undefined): string {
+  const stylesheetTag = stylesheet
+    ? `\n    <link rel="stylesheet" href="${escapeHtml(stylesheet)}" />`
+    : "";
+  return `${stylesheetTag}${buildSeoHeadTags(seo)}`;
 }
 
 function nonceAttr(nonce: string | undefined): string {
@@ -126,7 +137,7 @@ export async function renderPageOnce(
 
 function buildShellHtml(body: string, options: RenderOptions, islandScripts: string[]): string {
   const { islandProps } = options;
-  const title = options.title ?? "x app";
+  const title = options.seo?.title ?? options.title ?? "x app";
   const nonce = options.cspNonce;
   const propsJson = islandProps ? escapeJsonForScript(JSON.stringify(islandProps)) : "";
   const propsScript = islandProps
@@ -138,7 +149,7 @@ function buildShellHtml(body: string, options: RenderOptions, islandScripts: str
 
   return htmlShell(
     title,
-    buildHeadExtras(options.stylesheet),
+    buildHeadExtras(options.stylesheet, options.seo),
     propsScript,
     islandScriptsHtml,
     body,
@@ -248,7 +259,7 @@ export async function renderStreamingPage(
   options: RenderOptions = {},
 ): Promise<ReadableStream<Uint8Array>> {
   const { islandScripts, islandProps } = options;
-  const title = escapeHtml(options.title ?? "x app");
+  const title = escapeHtml(options.seo?.title ?? options.title ?? "x app");
   const nonce = options.cspNonce;
 
   const propsJson = islandProps ? escapeJsonForScript(JSON.stringify(islandProps)) : "";
@@ -257,7 +268,7 @@ export async function renderStreamingPage(
     : "";
   const navScriptTag = buildNavScriptTag(options.clientNav, nonce);
   const liveReloadTag = buildLiveReloadTag(options.liveReload, nonce);
-  const headExtras = buildHeadExtras(options.stylesheet);
+  const headExtras = buildHeadExtras(options.stylesheet, options.seo);
   const footer = `</div>${navScriptTag}\n${liveReloadTag}  </body>\n</html>`;
 
   const reactStream = await renderToReadableStream(node, {

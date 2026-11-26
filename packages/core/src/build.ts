@@ -14,6 +14,14 @@ import {
   scanPages,
   scanRoutes,
 } from "./router";
+import {
+  type GenerateSeo,
+  generateRobotsTxt,
+  generateSitemapXml,
+  type SeoConfig,
+  type SeoData,
+  type SitemapEntry,
+} from "./seo";
 
 import { registerServerFunctions } from "./server-functions";
 
@@ -36,12 +44,16 @@ export interface BuildOptions {
    * the generated file directly.
    */
   configPath?: string;
+  /** sitemap.xml/robots.txt generation. See `SeoConfig` in `./seo`. */
+  seo?: SeoConfig;
 }
 
 interface LoadedPage {
   entry: RouteEntry;
   mode: RouteMode;
   filePath: string;
+  seo: SeoData | undefined;
+  generateSeo: GenerateSeo | undefined;
   Component: ComponentType<{ params: Record<string, string> }>;
   layoutModules: ComponentType<{ children: ReactNode }>[];
   layoutFilePaths: string[];
@@ -144,6 +156,8 @@ export async function build(options: BuildOptions): Promise<void> {
     const mod = (await import(entry.filePath)) as {
       default?: ComponentType<{ params: Record<string, string> }>;
       mode?: RouteMode;
+      seo?: SeoData;
+      generateSeo?: GenerateSeo;
     };
     const Component = mod.default;
     if (!Component) {
@@ -170,6 +184,8 @@ export async function build(options: BuildOptions): Promise<void> {
       entry,
       filePath: entry.filePath,
       mode,
+      seo: mod.seo,
+      generateSeo: mod.generateSeo,
       Component,
       layoutModules,
       layoutFilePaths: layoutChain.map((l) => l.filePath),
@@ -193,12 +209,15 @@ export async function build(options: BuildOptions): Promise<void> {
 
   const writtenPaths = new Set<string>();
 
+  const sitemapEntries: SitemapEntry[] = [];
+
   for (const page of staticPages) {
     const params: Record<string, string> = {};
+    const seo = page.generateSeo ? await page.generateSeo({ params, loaderData: {} }) : page.seo;
     const registry = createIslandRegistry();
     const pageContent = renderPageWithLayout(page.Component, params, page.layoutModules);
     const content = createElement(IslandProvider, { registry }, pageContent);
-    const _html = renderStaticPage(content, { stylesheet: stylesheetHref });
+    const _html = renderStaticPage(content, { seo, stylesheet: stylesheetHref });
 
     const outPath =
       page.entry.routePath === "/" ? "/index.html" : `${page.entry.routePath}/index.html`;
@@ -225,9 +244,14 @@ export async function build(options: BuildOptions): Promise<void> {
       );
     }
 
-    const finalHtml = renderStaticPage(content, { islandScripts, stylesheet: stylesheetHref });
+    const finalHtml = renderStaticPage(content, {
+      seo,
+      islandScripts,
+      stylesheet: stylesheetHref,
+    });
     writeFileSync(fullPath, finalHtml, "utf-8");
     console.log(`  [static] ${page.entry.routePath} -> ${outPath}`);
+    sitemapEntries.push({ routePath: page.entry.routePath });
   }
 
   for (const content of contentEntries) {
@@ -238,8 +262,10 @@ export async function build(options: BuildOptions): Promise<void> {
       bodyHtml,
     });
     const rendered = createElement(IslandProvider, { registry }, pageContent);
+    const title = (content.frontmatter.title as string) ?? content.slug;
     const html = renderStaticPage(rendered, {
-      title: (content.frontmatter.title as string) ?? content.slug,
+      title,
+      seo: { title, description: content.frontmatter.description as string | undefined },
       stylesheet: stylesheetHref,
     });
 
@@ -251,6 +277,7 @@ export async function build(options: BuildOptions): Promise<void> {
       console.warn(`  [warn] collision: content ${content.routePath} overwrites existing output`);
     }
     writtenPaths.add(outPath);
+    sitemapEntries.push({ routePath: content.routePath });
 
     writeFileSync(fullPath, html, "utf-8");
     console.log(`  [content] ${content.routePath} -> ${outPath}`);
@@ -285,6 +312,35 @@ export async function build(options: BuildOptions): Promise<void> {
     console.log(
       `  [server] ${serverPages.length} page routes, ${apiRoutes.length} api routes -> server/index.ts`,
     );
+  }
+
+  // robots.txt/sitemap.xml cover what the build can see statically: static
+  // pages and content-collection entries, both enumerable here, plus
+  // whatever `seo.sitemap.extraUrls` supplies. `mode: "server"` routes with
+  // dynamic params (e.g. `/blog/[slug].tsx` backed by a database rather than
+  // a content collection) are not enumerable at build time and are not
+  // included automatically -- extraUrls is the escape hatch for those.
+  if (options.seo?.robots !== false) {
+    const robotsTxt =
+      typeof options.seo?.robots === "string"
+        ? options.seo.robots
+        : generateRobotsTxt({ siteUrl: options.seo?.siteUrl });
+    writeFileSync(join(clientDir, "robots.txt"), robotsTxt, "utf-8");
+    console.log("  [seo] robots.txt");
+  }
+
+  const sitemapConfig = options.seo?.sitemap;
+  if (options.seo?.siteUrl && sitemapConfig !== false) {
+    const extraUrlsConfig = typeof sitemapConfig === "object" ? sitemapConfig.extraUrls : undefined;
+    const extraUrls =
+      typeof extraUrlsConfig === "function" ? await extraUrlsConfig() : (extraUrlsConfig ?? []);
+    const allEntries: SitemapEntry[] = [
+      ...sitemapEntries,
+      ...extraUrls.map((routePath) => ({ routePath })),
+    ];
+    const siteUrl = options.seo.siteUrl.replace(/\/$/, "");
+    writeFileSync(join(clientDir, "sitemap.xml"), generateSitemapXml(allEntries, siteUrl), "utf-8");
+    console.log(`  [seo] sitemap.xml (${allEntries.length} urls)`);
   }
 
   console.log(`[x] build complete -> ${outDir}`);
