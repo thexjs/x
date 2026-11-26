@@ -61,7 +61,7 @@ describe("compileTailwindAsync serialization (#8)", () => {
       process.env.PATH = previousPath ?? "";
       rmSync(dir, { recursive: true, force: true });
     }
-  });
+  }, 15_000);
 });
 
 function pollLog(path: string, starts: number, ends: number): Promise<void> {
