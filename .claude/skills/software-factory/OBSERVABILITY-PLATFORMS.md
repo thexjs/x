@@ -7,6 +7,7 @@ Orientation for filling the observability platform slot, or deciding on a delibe
 ## How runners hook in
 
 Every type receives data through one of five hooks. Name the hook alongside the product when filling the slot.
+
 - **Harness OTel**: the agent harness exports OpenTelemetry itself. Claude Code and the Claude Agent SDK take `CLAUDE_CODE_ENABLE_TELEMETRY=1` plus `OTEL_*` variables, with prompts and tool output opt-in; Codex CLI takes an `[otel]` block in `config.toml`. ([Claude Agent SDK](https://code.claude.com/docs/en/agent-sdk/observability), [Claude Code](https://code.claude.com/docs/en/monitoring-usage), [Codex config](https://developers.openai.com/codex/config-advanced))
 - **Platform push**: the model platform sends traces for you, as Claude Managed Agents do to an OTLP destination set in the Claude Console. ([Claude docs](https://platform.claude.com/docs/en/manage-claude/opentelemetry/api))
 - **SDK wrapper**: one call in the runner's code, such as LangSmith's `configure_claude_agent_sdk()`.
@@ -62,6 +63,7 @@ OpenTelemetry is the common wire: harness OTel and platform push land in any OTL
 ## Researching further
 
 Check each candidate against the questions that decide this slot:
+
 1. **Does the runner or orchestrator already show enough?** Compare what the human needs (cross-run search, per-run cost, retention) with what the run page or sandbox dashboard gives. A yes here means a deliberate none.
 2. **How does the agent harness export traces?** Find which of the five hooks the harness supports, then which the product accepts. Confirm tool calls arrive as spans, and whether prompts and tool output need an opt-in.
 3. **Is it self-hostable?** Licence, which tier allows it, and what it runs on. Decisive when transcripts must stay in-house.

@@ -29,6 +29,7 @@ conservatively: prefer `patch`, avoid surprise `minor`s (`VERSIONING.md`).
 
 A change is **breaking (major)** if upgrading forces a consumer to change code
 or config:
+
 - Removing or renaming an exported API or public type.
 - Changing a function signature in a way that breaks existing callers.
 - Changing the shape of persisted data that is not migrated.
@@ -56,6 +57,7 @@ drop-in upgrade unless a changelog entry explicitly says otherwise.
 ## What "supported" means in practice
 
 For the latest major:
+
 - **Response to security issues** — per the SLA table in `SECURITY.md`
   (acknowledge within 48h; critical/high fix within 30 days of confirmation).
 - **Bug fixes** — tracked as issues; severity and scheduling are at the

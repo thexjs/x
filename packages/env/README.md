@@ -49,6 +49,7 @@ Environment validation failed:
 | `url()`              | any string parseable by `new URL(...)`                 |                                              |
 
 Built-in validators also expose two chaining combinators:
+
 - `.optional()` — a missing variable becomes `undefined` instead of failing;
   a present-but-invalid value still throws. `num().optional()` is typed
   `number | undefined`.

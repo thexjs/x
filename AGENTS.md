@@ -90,6 +90,7 @@ Routes are scanned from `pagesDir` (default `src/pages`). The `_` prefix is rese
 **API routes** export `GET`, `POST`, `PUT`, `PATCH`, `DELETE` handlers. Each receives the `Request` and returns a `Response`.
 
 **Page routes** export a default React component. Optional exports:
+
 - `export const mode = "static"` — prerender at build time (default: `"server"`)
 - `export const revalidate = 3600` — ISR: cache for N seconds
 - `export async function loader({ params, request })` — runs server-side, data passed as `loaderData`

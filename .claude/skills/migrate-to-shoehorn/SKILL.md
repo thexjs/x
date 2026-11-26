@@ -13,6 +13,7 @@ description: Migrate test files from `as` type assertions to @total-typescript/s
 **Test code only.** Never use shoehorn in production code.
 
 Problems with `as` in tests:
+
 - Trained not to use it
 - Must manually specify target type
 - Double-as (`as unknown as Type`) for intentionally wrong data

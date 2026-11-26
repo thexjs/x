@@ -17,6 +17,7 @@ That is the whole format. A learning record can be a single paragraph. The value
 ## Optional sections
 
 Only include these when they add genuine value. Most records won't need them.
+
 - **Status** frontmatter (`active | superseded by LR-NNNN`): useful when an earlier understanding turns out to be wrong and is replaced.
 - **Evidence**: how the user demonstrated the understanding (a question answered, an exercise completed, prior experience cited). Useful when the claim might be revisited.
 - **Implications**: what this unlocks or rules out for future sessions. Worth recording when non-obvious.
@@ -28,6 +29,7 @@ Scan `./learning-records/` for the highest existing number and increment by one.
 ## When to write a learning record
 
 Write one when any of these is true:
+
 1. **The user demonstrated genuine understanding of something non-trivial**: not just exposure, but evidence they can use the concept correctly. This sets a new floor for what to teach next.
 2. **The user disclosed prior knowledge**: "I already know X." Record it so future sessions don't re-teach it. Also record the _depth_ claimed.
 3. **A misconception was corrected**: the user previously believed something wrong and now sees why. These are high-value: they predict future stumbling blocks for related topics.

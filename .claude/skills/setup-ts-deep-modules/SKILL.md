@@ -25,6 +25,7 @@ src/packages/
 The public surface is the package's **root files**, not one designated `index.ts`. By convention implementation lives in `lib/` and tests in `tests/`, giving every package the same two-folder shape. The rule itself is general, though: _anything_ in _any_ subfolder is private, so you never extend the config to add a folder.
 
 Four rules, all `error`:
+
 1. **Entry-point boundary**: code outside a package (app code or another package) may import only that package's entry points (its root files), never anything in its subfolders.
 2. **Intra-package freedom**: a package's own files import each other freely.
 3. **Tests through the entry points**: files under `<pkg>/tests/` may import any package's entry points and their own `tests/` fixtures, but never any package's subfolder internals (not even their own). Integration tests across packages are fine; deep imports are not.
@@ -67,6 +68,7 @@ Copy [`dependency-cruiser.config.cjs`](./dependency-cruiser.config.cjs) to the r
 ### 5. Scaffold the example package
 
 Create a committed `<packages-root>/example/` as a copy-me template:
+
 - `index.ts` is an entry point. Export one function that delegates to an internal file (so the package is visibly _deep_, not a pass-through).
 - `lib/impl.ts`: an internal file in a **subfolder**, imported by `index.ts`, not reachable from outside.
 - `tests/example.test.ts` imports **only** `../index` (an entry point) and asserts against the public function.
@@ -78,6 +80,7 @@ Tell the user this is a starter template to copy or delete.
 ### 6. Prove the rules bite
 
 This is the completion criterion for the whole skill: a config that doesn't fail on a violation is worthless.
+
 1. Run `lint:boundaries`. It must **pass** on the clean example.
 2. Temporarily add a deep import to `tests/example.test.ts` (e.g. `import { thing } from "../lib/impl"`). Run `lint:boundaries` again; it must **fail** with `tests-through-entrypoints`.
 3. Revert the deep import. Run once more, and it must **pass**.
