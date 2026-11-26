@@ -1,6 +1,7 @@
 # Out-of-Scope Knowledge Base
 
 The `.out-of-scope/` directory in a repo stores persistent records of rejected feature requests. It serves two purposes:
+
 1. **Institutional memory**: why a feature was rejected, so the reasoning isn't lost when the issue is closed
 2. **Deduplication**: when a new issue comes in that matches a prior rejection, the skill can surface the previous decision instead of re-litigating it
 
@@ -28,6 +29,7 @@ This project does not support dark mode or user-facing theming.
 
 The rendering pipeline assumes a single color palette defined in
 `ThemeConfig`. Supporting multiple themes would require:
+
 - A theme context provider wrapping the entire component tree
 - Per-component theme-aware style resolution
 - A persistence layer for user theme preferences

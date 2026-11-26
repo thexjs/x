@@ -29,6 +29,7 @@ The scaffolder is feature-based — pick `tailwind`, `auth`, `content`, `hooks`,
 ## What x does differently
 
 Most "fast, modern React framework" pitches mean the same few things. These are the parts of `x` that are actually structurally different, not just styled differently:
+
 - **One runtime, not a stack of tools wearing a runtime's clothes.** Bundler, package manager, SQLite/Postgres drivers, and the HTTP server are all Bun natively — no separate bundler process negotiating with a separate server runtime. Fewer handoffs, fewer places for two tools' assumptions to disagree.
 - **Secrets are isolated structurally, not by convention.** A server action's body is swapped for a generated `fetch` wrapper _before_ the client bundler ever reads the real source (`actionsRewritePlugin`) — a leaked `DATABASE_URL` or `STRIPE_SECRET_KEY` in client code isn't "unlikely," it's excluded from the bundle at the file level. A regex scanner (`assertNoEnvLeakage`) runs after as a second check, not the only one.
 - **Security is a framework default, not an app author's homework.** CSP (with per-request nonces), CSRF double-submit checks, rate limiting, and a brute-force guard are on by default in `createApp` — most frameworks leave all of this to middleware you write yourself or the hosting platform's edge config.
@@ -40,6 +41,7 @@ See [docs/README.md](docs/README.md) for the full feature-by-feature walkthrough
 `x` is built assuming most people writing it — including experienced devs — reach for an AI coding agent to get things done. The problem: a general-purpose agent will confidently write Next.js/Remix/TanStack Start syntax that _looks_ like `x` but isn't, because file-based routing conventions across frameworks are close enough to be dangerous.
 
 Two things ground an agent in `x`'s actual conventions instead of its training data's best guess:
+
 - **[`@thexjs/mcp`](packages/mcp/README.md)** — an MCP server exposing `list_topics`, `get_docs`, `search_docs`, and `scaffold_file` tools, so an agent can look up the real routing/loader/action/middleware contract instead of guessing. Every project scaffolded with `bun create thexjs-app@latest` wires it up automatically — `.mcp.json` for Claude Code, `.cursor/mcp.json` for Cursor, no setup step.
 - **`AGENTS.md`** (+ a `CLAUDE.md` pointer) — shipped in every scaffolded project as the fallback for any agent without MCP access: routing conventions, the server-action contract, the env-var prefix rule, and the gotchas that actually bite.
 
@@ -82,6 +84,7 @@ my-app/
 A fair worry with a solo-maintained framework: what happens to your app if
 the project stalls? For `x`, less than it would for a framework that only
 runs on its own hosting platform — `x` doesn't have one.
+
 - **Bun process** — the default. `x build` + `bun dist/server/index.ts` on
   any VPS, bare metal, or behind `systemd`/`pm2`.
 - **Docker** — the multi-stage [`Dockerfile`](./Dockerfile) at the repo root

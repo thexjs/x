@@ -12,6 +12,7 @@ The user has passed (or will pass) a markdown file of raw material. This is **ex
 If the user did not say where to save the article, ask once and remember the path.
 
 Then run a beat-by-beat journey, choose-your-own-adventure style:
+
 1. **Establish the prerequisites.** Before any beats, settle with the user what the audience already knows walking in: the concepts that are **grounded** from the start. Everything else must be grounded by a beat before a later beat can use it. See [Grounding](#grounding).
 2. Write 2–3 candidate **starting beats**, drawn from the raw material. Each is a different entry point into the article. Each may only lean on grounded concepts; note what new concepts each one grounds. Show the user the beats before writing to the article file. The user picks one. Preview what beats that pick unlocks, as if the user is seeing a little way down the path.
 3. Once the user picks a starting beat, write **only that beat** to the article file. A beat may be one sentence or several paragraphs, whatever that beat naturally is. Stop there.
@@ -27,6 +28,7 @@ Then run a beat-by-beat journey, choose-your-own-adventure style:
 Every **concept** has to be **grounded** before a beat can lean on it: the audience either walked in knowing it or met it in an earlier beat. A beat that reaches for an ungrounded concept loses the reader; that is the one move the journey can't make. The unit is the concept, not the word for it: a beat can lean on an idea the reader lacks even with no jargon in sight. Where a concept has a name (a **term**), grounding it means landing the idea and the term together.
 
 A concept gets grounded one of two ways:
+
 - **Prerequisite**: grounded before the first beat. The audience brings it. Fixed at the start.
 - **Introduced**: a beat establishes it, and from then on it's grounded for every later beat.
 
@@ -41,6 +43,7 @@ The big lever is what you make a prerequisite versus what you ground inside the 
 A beat is one move in the journey. It does one thing: sets a scene, lands a point, asks a question, drops an aside, twists the angle. Then it stops, leaving the reader at a place where the next beat can pivot.
 
 A beat is sized by what it needs:
+
 - A single sentence if that's all the move is ("And then nothing happened for three weeks.").
 - A short paragraph if the move needs setup.
 - Multiple paragraphs if the beat is a self-contained vignette, argument, or example.

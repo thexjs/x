@@ -29,6 +29,7 @@ Ask the user: install for **this project only** (`.claude/settings.json`) or **a
 The bundled script is at: [scripts/block-dangerous-git.sh](scripts/block-dangerous-git.sh)
 
 Copy it to the target location based on scope:
+
 - **Project**: `.claude/hooks/block-dangerous-git.sh`
 - **Global**: `~/.claude/hooks/block-dangerous-git.sh`
 

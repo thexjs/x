@@ -21,6 +21,7 @@ bun scripts/bench/load.ts --slo
 The script boots a real production-mode app — the same `createApp().fetch`
 pipeline `x start` hands every request — over a real socket via `Bun.serve`,
 then measures:
+
 1. **SSR page throughput + latency** (default route: `/about`, a server-mode
    page whose loader returns a 10-item array, rendered through layouts and
    JSX).
@@ -85,6 +86,7 @@ scenario per the run below (longer runs produce tighter p99s).
 | Rate-limit burst (limit 10/60s, 100 req)  | —      | —      | —       | —       | 10 allowed / 90 rejected |
 
 Notes:
+
 - SSR pages are the heaviest path (loader + JSX render + layout wrapping);
   server functions are pure JSON round-trips, hence faster.
 - p95/p99 here are inflated by the fixed-duration harness: at 32 concurrency

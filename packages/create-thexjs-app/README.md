@@ -25,6 +25,7 @@ bun create thexjs-app@latest
 ```
 
 You'll be guided through interactive prompts:
+
 - **Project name** — e.g. `my-app`
 - **Features** — choose from Tailwind CSS, shadcn/ui, Auth, Content collections, and Hooks
 - **Install & git** — confirm dependency install and `git init`
