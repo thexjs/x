@@ -75,6 +75,7 @@ export function oneOf<T extends string>(values: readonly T[]): ScalarValidator<T
     if (!values.includes(input as T)) {
       throw new Error(`Expected one of ${values.join(", ")}, got "${input}"`);
     }
+    // Safe: the `includes` check above already validated that `input` is one of `values`.
     return input as T;
   });
 }

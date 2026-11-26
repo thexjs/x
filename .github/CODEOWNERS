@@ -1,1 +1,37 @@
+# See GOVERNANCE.md for how scope here grows: new contributors start with no
+# entry, earn a path-specific line after a track record in that area, and
+# widen from there. CODEOWNERS entries are additive -- the catch-all below
+# always applies; a path-specific line below it adds a required reviewer for
+# that path on top of (not instead of) the fallback.
+#
+# No scoped entries exist yet. When one is added, group it under the
+# matching comment heading rather than appending to the bottom, so this file
+# reads as "who owns what" rather than "who was added when."
+
+# -- Fallback: everything not covered by a more specific rule below --------
 * @abdelkabirouadoukou
+
+# -- packages/core -----------------------------------------------------------
+# (no scoped owner yet)
+
+# -- packages/auth ------------------------------------------------------------
+# (no scoped owner yet)
+
+# -- packages/cli / packages/create-thexjs-app --------------------------------
+# (no scoped owner yet)
+
+# -- packages/adapter-vercel / packages/adapter-node --------------------------
+# (no scoped owner yet)
+
+# -- packages/env / packages/hooks / packages/mcp -----------------------------
+# (no scoped owner yet)
+
+# -- Root governance/security/versioning docs ---------------------------------
+# Cross-cutting by definition (see GOVERNANCE.md's "Cross-cutting design
+# calls" section) -- not something a scoped CODEOWNERS entry should ever
+# cover on its own.
+/GOVERNANCE.md @abdelkabirouadoukou
+/SECURITY.md @abdelkabirouadoukou
+/THREAT_MODEL.md @abdelkabirouadoukou
+/VERSIONING.md @abdelkabirouadoukou
+/CODE_OF_CONDUCT.md @abdelkabirouadoukou
