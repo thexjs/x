@@ -185,3 +185,73 @@ describe("createEnv", () => {
     ).toThrow(/server\.PORT: Expected a number/);
   });
 });
+
+describe("createEnv client/server structural boundary", () => {
+  /**
+   * createEnv() returns one flat object with both server secrets and public
+   * values and no structural boundary between them — `JSON.stringify(env)`
+   * in a hydration payload (e.g. `window.__ENV__ = env`) can silently ship
+   * every server secret alongside the public ones. `env.client` exists so
+   * there's a shape that's structurally incapable of that: it only ever
+   * contains the keys that passed the `clientPrefix` check.
+   */
+  test("env.client contains only client-prefixed keys, never server keys", () => {
+    const env = createEnv({
+      server: {
+        DATABASE_URL: str(),
+        SECRET_API_KEY: str(),
+      },
+      client: {
+        THEXJS_PUBLIC_API_URL: url(),
+      },
+      runtimeEnv: {
+        DATABASE_URL: "postgres://localhost/db",
+        SECRET_API_KEY: "sk-super-secret",
+        THEXJS_PUBLIC_API_URL: "https://api.example.com",
+      },
+    });
+
+    // Flat top-level shape still works unchanged (non-breaking).
+    expect(env.DATABASE_URL).toBe("postgres://localhost/db");
+    expect(env.SECRET_API_KEY).toBe("sk-super-secret");
+    expect(env.THEXJS_PUBLIC_API_URL).toBe("https://api.example.com");
+
+    // `env.client` is the safe shape to serialize for the browser.
+    expect(env.client).toEqual({ THEXJS_PUBLIC_API_URL: "https://api.example.com" });
+
+    const serialized = JSON.stringify(env.client);
+    expect(serialized).not.toContain("sk-super-secret");
+    expect(serialized).not.toContain("postgres://localhost/db");
+    expect(serialized).not.toContain("SECRET_API_KEY");
+    expect(serialized).not.toContain("DATABASE_URL");
+
+    // Type-level assertion: a server-only key must not be assignable to
+    // `env.client`'s type. If a server key ever leaked into the inferred
+    // client shape, this would fail to typecheck.
+    // @ts-expect-error SECRET_API_KEY is a server-only key, not part of env.client's type
+    const _leak: string = env.client.SECRET_API_KEY;
+
+    // `env.server` mirrors the server-only keys, for symmetry.
+    expect(env.server).toEqual({
+      DATABASE_URL: "postgres://localhost/db",
+      SECRET_API_KEY: "sk-super-secret",
+    });
+  });
+
+  test("env.client is an empty object when no client schema is given", () => {
+    const env = createEnv({
+      server: { SECRET: str() },
+      runtimeEnv: { SECRET: "s3cr3t" },
+    });
+    expect(env.client).toEqual({});
+    expect(JSON.stringify(env.client)).toBe("{}");
+  });
+
+  test("env.server is an empty object when no server schema is given", () => {
+    const env = createEnv({
+      client: { THEXJS_PUBLIC_API_URL: url() },
+      runtimeEnv: { THEXJS_PUBLIC_API_URL: "https://api.example.com" },
+    });
+    expect(env.server).toEqual({});
+  });
+});

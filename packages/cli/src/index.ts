@@ -240,11 +240,27 @@ async function detectOptions(): Promise<{ options: DetectedOptions; configPath: 
   return { options: detectDefaultOptions(projectDir), configPath: null };
 }
 
+/**
+ * Resolve `@thexjs/core` relative to the project, or print the same
+ * "node_modules/@thexjs is missing" hint doctor.ts gives and exit, instead of
+ * letting `Bun.resolveSync`'s raw ResolveError reach the top-level error
+ * boundary as a native stack trace.
+ */
+function resolveCoreOrExit(dir: string): string {
+  try {
+    return Bun.resolveSync("@thexjs/core", dir);
+  } catch {
+    xError('could not resolve "@thexjs/core" -- node_modules/@thexjs is missing');
+    xError("run `bun install`");
+    return process.exit(1);
+  }
+}
+
 async function cmdDev(): Promise<void> {
   const startTime = performance.now();
   reporter.banner();
   const { options: opts } = await detectOptions();
-  const corePath = Bun.resolveSync("@thexjs/core", projectDir);
+  const corePath = resolveCoreOrExit(projectDir);
   const { createApp, installProcessCrashHandlers } = await import(corePath);
   const { port: _port, ...dirs } = opts;
   // createApp's own request logger (observability.logging, on by default)
@@ -572,7 +588,7 @@ async function cmdBuild(adapterName: string | undefined): Promise<void> {
     process.exit(1);
   }
 
-  const corePath = Bun.resolveSync("@thexjs/core", projectDir);
+  const corePath = resolveCoreOrExit(projectDir);
   const { build } = await import(corePath);
   const outDir = resolve(projectDir, outDirFlag ?? ".x");
   const counts = await runBuildCapturingOutput(reporter, start, () =>
@@ -861,4 +877,12 @@ async function main(): Promise<void> {
   }
 }
 
-await main();
+main().catch((err: unknown) => {
+  // Top-level error boundary: anything that escapes a command (a throwing
+  // x.config.ts, Bun.resolveSync failures we didn't pre-empt, EACCES on a
+  // port bind, etc.) is reported through the same styled xError output as
+  // the rest of the CLI, instead of a raw native stack trace -- mirroring
+  // create-thexjs-app's own top-level boundary.
+  xError(err instanceof Error ? err.message : String(err));
+  process.exit(1);
+});

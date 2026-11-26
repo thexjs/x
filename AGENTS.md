@@ -95,6 +95,12 @@ Routes are scanned from `pagesDir` (default `src/pages`). The `_` prefix is rese
 - `export const revalidate = 3600` — ISR: cache for N seconds
 - `export async function loader({ params, request })` — runs server-side, data passed as `loaderData`
 - `export const middleware` — route-level middleware (alternative to `_middleware.ts`)
+- `export const seo = { title, description, canonical, robots, openGraph, twitter, jsonLd }` — static per-page SEO (`SeoData` from `@thexjs/core`)
+- `export function generateSeo({ params, loaderData })` — per-request SEO computed from the same data `loader` produced (e.g. `/blog/[slug]` titling itself from the post it loaded); takes precedence over `seo` when both are present
+
+## SEO
+
+`x.config.ts`'s `seo` option (`siteUrl`, `sitemap`, `robots`) drives `x build`'s sitemap.xml/robots.txt generation: static-mode pages and content-collection entries (both enumerable at build time) are included automatically; `seo.sitemap.extraUrls` adds routes the build can't discover on its own (e.g. a `mode: "server"` dynamic route backed by a database). No `seo`/`generateSeo` export and no `x.config.ts` `seo` option means every page still renders `<title>x app</title>` with no extra tags, same as before this existed.
 
 ## Server functions
 
