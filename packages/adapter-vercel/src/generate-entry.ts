@@ -13,7 +13,7 @@ export function generateEntrySource(manifest: BuildManifest, entryDir: string): 
 // -- Vercel trusted-proxy opt-in -----------------------------------------------
 // Vercel's edge always sets X-Forwarded-For correctly; trust it for IP resolution
 // (brute-force guards, audit trails). See @thexjs/core security/trusted-proxy.ts.
-import { configureTrustedProxy } from "@thexjs/core";
+import { configureTrustedProxy, isTrustedProxy } from "@thexjs/core";
 configureTrustedProxy({ trustForwardedHeaders: true });
 
 // -- Node <-> Web Request/Response bridge (Vercel \`nodejs*.x\` runtime
@@ -30,6 +30,17 @@ configureTrustedProxy({ trustForwardedHeaders: true });
 // never do. This is a deliberate widening, not an oversight - the character
 // class still fails closed on everything else (spaces, commas, control
 // characters), so multiple/duplicated or malformed values never pass.
+//
+// Format validation alone is NOT a trust decision -- it only rejects
+// malformed values, it doesn't prove the header actually came from Vercel's
+// edge rather than from the client. \`nodeRequestToWebRequest\` below gates
+// every call to \`forwardedHeader\` on \`isTrustedProxy()\` (the same flag
+// \`configureTrustedProxy\` sets above, and the same gate core's own
+// \`isSecureRequest\`/\`clientIpFromRequest\` use). This matters because the
+// \`url\` built here is what CSRF's \`requestOrigin()\` later reads as the
+// request's "self" origin -- without the gate, a spoofed \`x-forwarded-host\`
+// would self-authenticate as same-origin for CSRF if this bridge ever ran
+// somewhere that doesn't strip client-supplied forwarded headers.
 function forwardedHeader(req, name) {
   const value = req.headers[name];
   if (value === undefined) return undefined;
@@ -47,9 +58,14 @@ function forwardedHeader(req, name) {
 }
 
 function nodeRequestToWebRequest(req) {
-  const proto = forwardedHeader(req, "x-forwarded-proto");
+  // Forwarded proto/host are only ever consulted when the app has opted into
+  // trusting them (see the comment on \`forwardedHeader\` above). This is the
+  // actual trust boundary -- format validation inside \`forwardedHeader\` is
+  // not a substitute for it.
+  const trustForwarded = isTrustedProxy();
+  const proto = trustForwarded ? forwardedHeader(req, "x-forwarded-proto") : undefined;
   const protocol = proto === "http" || proto === "https" ? proto : (req.socket && req.socket.encrypted ? "https" : "http");
-  const forwardedHost = forwardedHeader(req, "x-forwarded-host");
+  const forwardedHost = trustForwarded ? forwardedHeader(req, "x-forwarded-host") : undefined;
   const host = forwardedHost || req.headers.host || "localhost";
   const url = \`\${protocol}://\${host}\${req.url}\`;
   const headers = new Headers();

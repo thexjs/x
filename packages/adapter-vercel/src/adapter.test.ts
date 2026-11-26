@@ -1,8 +1,9 @@
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
 import { once } from "node:events";
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer, type ServerResponse } from "node:http";
 import { join } from "node:path";
+import { checkCsrf, configureTrustedProxy, isTrustedProxy, resetTrustedProxy } from "@thexjs/core";
 import { generateEntrySource } from "./generate-entry";
 import { buildVercelOutput } from "./index";
 import type { BuildManifest } from "./types";
@@ -331,6 +332,127 @@ describe("sendWebResponse (generated entry, executes the real bridge)", () => {
     expect(result.headers["content-range"]).toBe("bytes 0-5/100");
     // 6 bytes actually emitted -> computed length, not the stale 999.
     expect(result.headers["content-length"]).toBe("6");
+  });
+});
+
+describe("nodeRequestToWebRequest (generated entry, executes the real bridge) -- CSRF forwarded-host trust (#173)", () => {
+  // nodeRequestToWebRequest and forwardedHeader are emitted as plain JS
+  // inside the generated entry source (a template string in
+  // generate-entry.ts). Extract both (nodeRequestToWebRequest calls
+  // forwardedHeader) and eval them, injecting the real `isTrustedProxy` from
+  // @thexjs/core -- the same function the generated source itself imports --
+  // so the test exercises the actual trust gate, not a re-implementation of
+  // it.
+  function evalNodeRequestToWebRequest(src: string): (req: unknown) => Request {
+    function extractFunction(marker: string): string {
+      const startIdx = src.indexOf(marker);
+      if (startIdx === -1) throw new Error(`${marker} not found in generated entry`);
+      const open = src.indexOf("{", startIdx);
+      let depth = 0;
+      let end = -1;
+      for (let i = open; i < src.length; i++) {
+        if (src[i] === "{") depth++;
+        else if (src[i] === "}") {
+          depth--;
+          if (depth === 0) {
+            end = i + 1;
+            break;
+          }
+        }
+      }
+      if (end === -1) throw new Error(`could not find end of ${marker}`);
+      return src.slice(startIdx, end);
+    }
+
+    const fnSrc = [
+      extractFunction("function forwardedHeader(req, name)"),
+      extractFunction("function nodeRequestToWebRequest(req)"),
+    ].join("\n");
+    // eslint-disable-next-line no-new-func
+    const compile = new Function("isTrustedProxy", `${fnSrc}; return nodeRequestToWebRequest;`);
+    return compile(isTrustedProxy) as (req: unknown) => Request;
+  }
+
+  function fakeNodeRequest(headers: Record<string, string>) {
+    return {
+      method: "POST",
+      url: "/__x/actions/whatever",
+      headers,
+      socket: { encrypted: false },
+    };
+  }
+
+  afterEach(() => {
+    resetTrustedProxy();
+  });
+
+  test("an attacker-controlled x-forwarded-host cannot self-authenticate as same-origin for CSRF when trust is not configured", () => {
+    resetTrustedProxy(); // default: trustForwardedHeaders is off
+
+    const nodeRequestToWebRequest = evalNodeRequestToWebRequest(
+      generateEntrySource(unitManifest(), "/tmp/e"),
+    );
+    // The attacker controls both the forwarded-host header AND the Origin
+    // header on their own request -- if the forwarded host were trusted as
+    // "self", self === origin and CSRF would wrongly pass. The real host is
+    // myapp.example (what the connection is actually terminated as).
+    const webRequest = nodeRequestToWebRequest(
+      fakeNodeRequest({
+        host: "myapp.example",
+        "x-forwarded-host": "evil.attacker.com",
+        origin: "https://evil.attacker.com",
+      }),
+    );
+
+    // Without the trust gate, the url would be built from the spoofed host.
+    expect(new URL(webRequest.url).host).toBe("myapp.example");
+
+    const result = checkCsrf(webRequest);
+    expect(result.ok).toBe(false);
+  });
+
+  test("a legitimate forwarded host is honored once the app opts into trusting it", () => {
+    configureTrustedProxy({ trustForwardedHeaders: true });
+
+    const nodeRequestToWebRequest = evalNodeRequestToWebRequest(
+      generateEntrySource(unitManifest(), "/tmp/e"),
+    );
+    // A real reverse proxy sets x-forwarded-host to the public-facing host
+    // the client actually requested, and the client's own Origin matches it.
+    const webRequest = nodeRequestToWebRequest(
+      fakeNodeRequest({
+        host: "127.0.0.1:3000",
+        "x-forwarded-host": "app.example.com",
+        "x-forwarded-proto": "https",
+        origin: "https://app.example.com",
+      }),
+    );
+
+    expect(new URL(webRequest.url).host).toBe("app.example.com");
+
+    const result = checkCsrf(webRequest);
+    expect(result.ok).toBe(true);
+  });
+
+  test("a spoofed host still cannot self-authenticate even with trust configured, once the attacker's own Origin disagrees with it", () => {
+    // Trusting forwarded headers is about which host the app treats as
+    // "self" when ops actually run it behind a real proxy -- it is not a
+    // CSRF bypass on its own: the Origin header still has to agree.
+    configureTrustedProxy({ trustForwardedHeaders: true });
+
+    const nodeRequestToWebRequest = evalNodeRequestToWebRequest(
+      generateEntrySource(unitManifest(), "/tmp/e"),
+    );
+    const webRequest = nodeRequestToWebRequest(
+      fakeNodeRequest({
+        host: "app.example.com",
+        "x-forwarded-host": "app.example.com",
+        origin: "https://evil.attacker.com",
+      }),
+    );
+
+    const result = checkCsrf(webRequest);
+    expect(result.ok).toBe(false);
   });
 });
 
