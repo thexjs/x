@@ -1,5 +1,13 @@
 # @thexjs/adapter-vercel
 
+## 1.0.15
+
+### Patch Changes
+
+- c11cb47: Gate `x-forwarded-proto`/`x-forwarded-host` consumption in the generated entry's Node-to-Web `Request` bridge behind `isTrustedProxy()`. Format validation alone isn't a trust decision — the forwarded host feeds the `url` that CSRF's `requestOrigin()` later reads as the request's "self" origin, so without the gate, a spoofed `x-forwarded-host` (paired with a matching `Origin` header) would self-authenticate as same-origin for CSRF if this bridge ever ran somewhere that doesn't strip client-supplied forwarded headers.
+- Updated dependencies [601e2a9]
+  - @thexjs/core@1.15.0
+
 ## 1.0.14
 
 ### Patch Changes

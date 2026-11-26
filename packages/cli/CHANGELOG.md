@@ -1,5 +1,22 @@
 # @thexjs/cli
 
+## 1.3.2
+
+### Patch Changes
+
+- 5ad1573: Wrap the CLI's top-level `main()` in an error boundary (`main().catch(...)`) so any uncaught rejection — a throwing `x.config.ts`, an `EACCES` port bind, a resolve failure — reports through the same styled `xError` output as the rest of the CLI, instead of a raw native stack trace. Also pre-flight `Bun.resolveSync("@thexjs/core", ...)` in `cmdDev`/`cmdBuild` so a project missing `node_modules` gets a friendly "run `bun install`" hint instead of a raw `ResolveError`.
+- 601e2a9: Add built-in SEO support. Every page previously rendered `<title>x app</title>` with no description, Open Graph, Twitter card, canonical, or structured-data tags unless an app hand-built this itself — every example app included.
+  - Pages can now export `seo` (a static `SeoData` object) or `generateSeo({ params, loaderData })` (computed per-request, so a dynamic route like `/blog/[slug]` can title itself from the data its own `loader` fetched) for description, canonical, `robots`, Open Graph, Twitter card, and JSON-LD.
+  - `x.config.ts` gets a `seo` option (`siteUrl`, `sitemap`, `robots`) consumed by `x build`: static-mode pages and content-collection entries (both enumerable at build time) are written into `sitemap.xml` automatically, plus a `robots.txt` with a `Sitemap:` directive. `seo.sitemap.extraUrls` adds routes the build can't enumerate on its own (e.g. a dynamic route backed by a database). `mode: "server"` routes with dynamic params are excluded from the sitemap by default since there's no way to enumerate their possible values at build time.
+  - Content-collection entries map their frontmatter `description` field into the page's meta description automatically.
+  - The 404 page now ships `robots: noindex`.
+
+  Fully additive: a page with no `seo`/`generateSeo` export renders exactly as before.
+- Updated dependencies [c11cb47]
+- Updated dependencies [601e2a9]
+  - @thexjs/adapter-vercel@1.0.15
+  - @thexjs/core@1.15.0
+
 ## 1.3.1
 
 ### Patch Changes
