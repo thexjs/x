@@ -31,6 +31,7 @@ The solution to the problem, from the user's perspective.
 ## User Stories
 
 A LONG, numbered list of user stories. Each user story should be in the format of:
+
 1. As an <actor>, I want a <feature>, so that <benefit>
 
 <user-story-example>
@@ -42,6 +43,7 @@ This list of user stories should be extremely extensive and cover all aspects of
 ## Implementation Decisions
 
 A list of implementation decisions that were made. This can include:
+
 - The modules that will be built/modified
 - The interfaces of those modules that will be modified
 - Technical clarifications from the developer
@@ -57,6 +59,7 @@ Exception: if a prototype produced a snippet that encodes a decision more precis
 ## Testing Decisions
 
 A list of testing decisions that were made. Include:
+
 - A description of what makes a good test (only test external behavior, not implementation details)
 - Which modules will be tested
 - Prior art for the tests (i.e. similar types of tests in the codebase)

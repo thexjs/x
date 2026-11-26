@@ -57,6 +57,7 @@ okay later, not because I'm precious about git history.
 If you're new to the repo, start from the
 [`good first issue` / `help wanted` labels](https://github.com/thexjs/x/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22).
 Each issue lists acceptance criteria and a regression test to add.
+
 - **Comment on the issue first** to claim it and avoid overlap.
 - PRs are reviewed on a best-effort weekly window (maintenance mode), so
   **small, test-backed PRs** are the fastest path through review — a focused
@@ -139,6 +140,7 @@ deprecation window before removal, and how pre-release (canary/next) tags work.
 ### What happens on merge to main
 
 The `.github/workflows/release.yml` workflow runs on every push to `main`:
+
 1. Installs dependencies and runs `build:packages`, `typecheck`, `lint`, and
    `test`: the job fails if any of these fail, before anything is released.
 2. `changesets/action@v2` then:

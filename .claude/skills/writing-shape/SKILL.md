@@ -31,6 +31,7 @@ If the user did not say where to save the article, ask once and remember the pat
 Every **concept** has to be **grounded** before a block can lean on it: the reader either walked in knowing it or met it in an earlier block. A block that reaches for an ungrounded concept loses the reader. The unit is the concept, not the word for it: a block can lean on an idea the reader lacks even with no jargon in sight. Where a concept has a name (a **term**), grounding it means landing the idea and the term together.
 
 A concept gets grounded one of two ways:
+
 - **Prerequisite**: grounded before the opening. The reader brings it. Fixed at the start.
 - **Introduced**: a block establishes it, and from then on it's grounded for the rest of the article.
 
@@ -43,6 +44,7 @@ The lever is what you make a prerequisite versus what you ground inside the arti
 This is a grilling session inverted. In ideation, the question was "what are you actually noticing?" Here it's "what is this article actually arguing, and in what order does the reader need to hear it?" Push back. Refuse to let weak transitions slide. If a paragraph doesn't earn its place, cut it.
 
 Specific moves to keep using:
+
 - "What does this paragraph do for the reader that the previous one didn't?"
 - "If I cut this, what breaks?"
 - "Is this prose, or should it be a list? Why prose?"
@@ -58,6 +60,7 @@ If the pile lacks something the article needs, name the gap explicitly: "We need
 ## Format arguments to actually have
 
 When choosing how to render a block, weigh these tradeoffs out loud with the user, not silently:
+
 - **Prose vs. list.** Prose carries argument; lists carry parallel items. If items aren't truly parallel, prose is better. If they are, a list is faster to scan.
 - **Inline vs. callout.** Tips, warnings, and asides go in callouts (`> [!TIP]`, `> [!NOTE]`), but only if they'd genuinely derail the main argument inline. Otherwise leave them inline.
 - **Table vs. repeated structure.** If the same shape repeats 3+ times with the same fields, a table. Otherwise prose with bold leads.
