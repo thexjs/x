@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { createApp } from "./createApp";
+import { LIVE_RELOAD_SCRIPT } from "./live-reload";
 
 /**
  * Dev and prod build their fetch handler from the same `buildFetchInner`
@@ -54,11 +55,8 @@ async function snapshot(res: Response) {
 // unrelated reload-script injection.
 function stripDevReloadScript(html: string): string {
   return html
-    .replace(
-      /<script nonce="[^"]*">\(function \(\) \{\s*var es = new EventSource[\s\S]*?<\/script>/,
-      "",
-    )
     .replace(/ nonce="[^"]*"/g, "")
+    .replace(`<script>${LIVE_RELOAD_SCRIPT}</script>`, "")
     .replace(/\s+/g, " ")
     .trim();
 }
