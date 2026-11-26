@@ -18,6 +18,7 @@ Create exercise directory structures that pass `pnpm ai-hero-cli internal lint`,
 ## Exercise variants
 
 Each exercise needs at least one of these subfolders:
+
 - `problem/` - student workspace with TODOs
 - `solution/` - reference implementation
 - `explainer/` - conceptual material, no TODOs
@@ -27,6 +28,7 @@ When stubbing, default to `explainer/` unless the plan specifies otherwise.
 ## Required files
 
 Each subfolder (`problem/`, `solution/`, `explainer/`) needs a `readme.md` that:
+
 - Is **not empty** (must have real content, even a single title line works)
 - Has no broken links
 
@@ -51,6 +53,7 @@ If the subfolder has code, it also needs a `main.ts` (>1 line). But for stubs, a
 ## Lint rules summary
 
 The linter (`pnpm ai-hero-cli internal lint`) checks:
+
 - Each exercise has subfolders (`problem/`, `solution/`, `explainer/`)
 - At least one of `problem/`, `explainer/`, or `explainer.1/` exists
 - `readme.md` exists and is non-empty in the primary subfolder
@@ -63,6 +66,7 @@ The linter (`pnpm ai-hero-cli internal lint`) checks:
 ## Moving/renaming exercises
 
 When renumbering or moving exercises:
+
 1. Use `git mv` (not `mv`) to rename directories - preserves git history
 2. Update the numeric prefix to maintain order
 3. Re-run lint after moves

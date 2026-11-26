@@ -7,6 +7,7 @@ file is the honest scoreboard, not a marketing plan.
 
 The project is in **maintenance mode** while the author is busy with the
 college. What that means:
+
 - **Feature work is frozen.** The existing surface is the surface; new ideas
   go to the issue board for later, not into `main` this season.
 - **Community-run.** The repo is set up for contributors: issues are labeled

@@ -15,6 +15,7 @@ test("user can checkout with valid cart", async () => {
 ```
 
 Characteristics:
+
 - Tests behavior users/callers care about
 - Uses public API only
 - Survives internal refactors
@@ -35,6 +36,7 @@ test("checkout calls paymentService.process", async () => {
 ```
 
 Red flags:
+
 - Mocking internal collaborators
 - Testing private methods
 - Asserting on call counts/order

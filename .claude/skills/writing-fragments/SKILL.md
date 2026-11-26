@@ -26,6 +26,7 @@ On first write, put a single H1 at the top with a working title (it can change l
 A fragment is any piece of text that might survive into the final article. It must be _readable by the author_ (the author can tell what it means), but it does not need to define its terms or be comprehensible to a cold reader. The bar is "is this a piece of good writing?", not "is this a self-contained argument?"
 
 Fragments are deliberately heterogeneous. Examples of what could be a fragment:
+
 - A sharp sentence you'd want to deploy somewhere but don't yet know where.
 - A claim with a one-line justification.
 - A vignette: a thing that happened, a code snippet, a scenario, an analogy.

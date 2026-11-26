@@ -56,6 +56,7 @@ Files and directories prefixed with `_` or `.` are never treated as routes.
 ### Route resolution order
 
 When several routes could match one URL, the most specific one wins:
+
 1. **Static (literal) routes beat dynamic ones** — `/users/new` is served by
    `pages/users/new.tsx`, never by `pages/users/[id].tsx`.
 2. **Single-segment params beat catch-alls** — `[slug].tsx` matches

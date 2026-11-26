@@ -46,6 +46,7 @@ This works whether the user is here to push back or not.
 ### 2. Generate radically different variants
 
 Draft each variant. Hold each one to:
+
 - The page's purpose and the data it has access to.
 - The project's component library / styling system (TailwindCSS, shadcn, MUI, plain CSS, whatever).
 - A clear exported component name, e.g. `VariantA`, `VariantB`, `VariantC`.
@@ -76,11 +77,13 @@ For sub-shape B (new page): the throwaway route under `/prototype/<name>` mounts
 ### 4. Build the floating switcher
 
 A small fixed-position bar at the bottom-centre of the screen with three pieces:
+
 - **Left arrow**: cycles to the previous variant (wraps around).
 - **Variant label**: shows the current variant key and, if the variant exports a name, that name too. e.g. `B (Sidebar layout)`.
 - **Right arrow**: cycles forward (wraps around).
 
 Behaviour:
+
 - Clicking an arrow updates the URL search param (use the framework's router, e.g. `router.replace` on Next, `navigate` on React Router, etc) so the variant is shareable and reload-stable.
 - Keyboard: `←` and `→` arrow keys also cycle. Don't intercept arrow keys when an `<input>`, `<textarea>`, or `[contenteditable]` is focused.
 - Visually distinct from the page (e.g. high-contrast pill, subtle shadow) so it's obviously not part of the design being evaluated.
@@ -95,6 +98,7 @@ Surface the URL (and the `?variant=` keys). The user will flip through whenever 
 ### 6. Capture the answer and clean up
 
 Once a variant has won, capture the answer (which variant and why), then capture the prototype the way the [SKILL](SKILL.md) describes. Fold the winner into the real code and move the rest onto the throwaway branch, not into main:
+
 - **Sub-shape A**: fold the winner into the existing page; drop the losing variants and the switcher from main.
 - **Sub-shape B**: promote the winning variant to a real route; drop the throwaway route and the switcher from main.
 

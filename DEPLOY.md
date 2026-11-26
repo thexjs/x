@@ -37,6 +37,7 @@ x build --outDir dist
 ```
 
 This produces:
+
 - `dist/client/`: fully static assets (HTML, island JS chunks, content pages)
 - `dist/server/index.ts`: the generated server entry, run directly with `bun`
 
@@ -148,6 +149,7 @@ platform-agnostic adapter SDK exported from `@thexjs/core/adapter`
 (`packages/core/src/adapter/`). A third adapter (Cloudflare, Netlify, a
 different Node host with its own packaging format, ...) composes the same
 four pieces:
+
 1. **`resolveBuildManifest(options, scratchDir)`** -- scans every
    server-mode route, layout, middleware, and action file at build time into
    a `BuildManifest`. This is what lets the output run somewhere that can't
@@ -184,6 +186,7 @@ It builds the same multi-stage `Dockerfile` the "Docker" section above uses
 auth needs Bun at runtime (see the caveat above), and Fly runs an arbitrary
 container anyway, so there's no Node-only constraint to route around here the
 way there is on Railway/Render.
+
 1. Install the [Fly CLI](https://fly.io/docs/hands-on/install-flyctl/)
 2. Review `fly.toml` -- at minimum change `app` to a name you own
 3. Launch:

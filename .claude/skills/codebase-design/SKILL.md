@@ -53,6 +53,7 @@ Use these terms exactly: don't substitute "component," "service," "API," or "bou
 ```
 
 When designing an interface, ask:
+
 - Can I reduce the number of methods?
 - Can I simplify the parameters?
 - Can I hide more complexity inside?
@@ -67,6 +68,7 @@ When designing an interface, ask:
 ## Designing for testability
 
 Good interfaces make testing natural:
+
 1. **Accept dependencies, don't create them.**
 
    ```typescript

@@ -14,6 +14,7 @@ which it is by default.
 The framework is a **Bun single-process server** that serves HTML, static
 assets, API routes, server functions, and a remote-image proxy. The trust
 boundary is the network edge:
+
 - **Untrusted**: any remote client (browser or otherwise) and any remote host
   a user asks the image proxy to fetch.
 - **Trusted**: your config (`x.config.ts`), your route/action/loader code, your
@@ -118,6 +119,7 @@ isolation** between routes. An uncaught exception in any API route, SSR loader,
 or server function is contained per-request by the global error boundary (clean
 `500`, error reporter) and does **not** crash the process. What is **not**
 contained:
+
 - A handler that blocks the event loop (synchronous CPU-bound work, an
   unawaited Promise keeping the loop busy) stalls **every** route on that
   process.

@@ -25,10 +25,12 @@ Every comment or issue posted to the issue tracker during triage **must** start 
 ## Roles
 
 Two **category** roles:
+
 - `bug`: something is broken
 - `enhancement`: new feature or improvement
 
 Five **state** roles:
+
 - `needs-triage`: maintainer needs to evaluate
 - `needs-info`: waiting on reporter for more information
 - `ready-for-agent`: fully specified, ready for an AFK agent
@@ -46,6 +48,7 @@ State transitions: an unlabeled issue normally goes to `needs-triage` first; fro
 ## Invocation
 
 The maintainer invokes `/triage` and describes what they want in natural language. Interpret the request and act. Examples:
+
 - "Show me anything that needs my attention"
 - "Let's look at #42" (issue or PR)
 - "Move #42 to ready-for-agent"
@@ -54,6 +57,7 @@ The maintainer invokes `/triage` and describes what they want in natural languag
 ## Show what needs attention
 
 Query the issue tracker and present three buckets, oldest first:
+
 1. **Unlabeled**: never triaged.
 2. **`needs-triage`**: evaluation in progress.
 3. **`needs-info` with reporter activity since the last triage notes**: needs re-evaluation.
@@ -92,10 +96,12 @@ If the maintainer says "move #42 to ready-for-agent", trust them and apply the r
 ## Triage Notes
 
 **What we've established so far:**
+
 - point 1
 - point 2
 
 **What we still need from you (@reporter):**
+
 - question 1
 - question 2
 ```
