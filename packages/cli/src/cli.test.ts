@@ -1,7 +1,16 @@
 import { Database } from "bun:sqlite";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { spawn, spawnSync } from "node:child_process";
-import { appendFileSync, chmodSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import {
+  appendFileSync,
+  chmodSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 /**
@@ -704,5 +713,40 @@ export const islands = { Like: Like };
     expect(output).toContain("ensure bun is installed");
     expect(output).toContain("bun.sh");
     rmSync(noBun, { recursive: true, force: true });
+  });
+
+  test("x build prints a friendly 'bun install' hint when @thexjs/core can't resolve (#181)", () => {
+    // Must live fully outside this repo's own node_modules tree (which
+    // hoists @thexjs/core up to the workspace root) so Bun.resolveSync
+    // genuinely fails to find it, the same way it would in a project that
+    // never ran `bun install`.
+    const noModules = mkdtempSync(join(tmpdir(), "x-cli-no-node-modules-"));
+    writeFileSync(
+      join(noModules, "x.config.ts"),
+      'export default { pagesDir: "src/pages", port: 3000 };\n',
+    );
+    mkdirSync(join(noModules, "src/pages"), { recursive: true });
+    writeFileSync(
+      join(noModules, "src/pages/index.tsx"),
+      "export default function Home() { return null; }\n",
+    );
+    // An empty node_modules (rather than a wholly absent one) blocks Bun's
+    // global package-cache fallback resolution, so Bun.resolveSync genuinely
+    // throws the way it would on a machine that never ran `bun install` --
+    // otherwise this dev box's own global cache would silently resolve
+    // @thexjs/core anyway and the test would exercise nothing.
+    mkdirSync(join(noModules, "node_modules"), { recursive: true });
+
+    const res = spawnSync(process.execPath, [CLI_ENTRY, "build", "--cwd", noModules], {
+      cwd: noModules,
+      encoding: "utf-8",
+      timeout: 10_000,
+    });
+    const output = res.stdout + res.stderr;
+    expect(res.status).not.toBe(0);
+    expect(output).toContain("bun install");
+    expect(output).not.toContain("ResolveError");
+    expect(output).not.toContain("resolveSync");
+    rmSync(noModules, { recursive: true, force: true });
   });
 });
