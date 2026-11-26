@@ -56,6 +56,7 @@ Pass `headers: false` to disable entirely (not recommended in production).
 
 Server actions (`/__x/actions/*`) and other mutating endpoints are protected
 by two independent checks:
+
 1. **Origin/Referer verification (always on)**: cross-site `POST` requests
    whose `Origin` (or `Referer`) doesn't match the app's own origin are
    rejected. This alone stops the vast majority of CSRF attempts with zero setup.
@@ -134,6 +135,7 @@ behavior described above, by design.
 **Only variables prefixed `THEXJS_PUBLIC_` may appear in client-shipped code.**
 Anything else referenced from a client bundle fails the build with an
 `EnvLeakageError`, enforced two ways:
+
 1. **Build-time interception**: client imports of `src/actions/*` server
    functions are rewritten to `fetch()` wrappers before the client bundler
    ever reads the real source, so secrets in action bodies are structurally
@@ -168,6 +170,7 @@ STRIPE_SECRET_KEY=sk_live_...
 (username/password) and OAuth2 (including a GitHub preset) providers, session
 stores on the data layer (SQLite/Postgres), and a catch-all API handler. Its
 security properties:
+
 - **Passwords** — hashed with Argon2id via `Bun.password` (`hashPassword` /
   `verifyPassword`). Never store plaintext.
 - **Session tokens** — opaque random 128-bit strings. Only an HMAC-SHA256
@@ -253,6 +256,7 @@ Fly checks, Railway healthchecks).
 Please **do not** open a public issue for security problems. Email the
 maintainer at the address in the repository profile, or open a GitHub
 Security Advisory via the repo's **Security** tab (private). Include:
+
 - A description of the issue and its impact.
 - Steps to reproduce (minimal code/config).
 - Whether it affects a published package version.
@@ -290,6 +294,7 @@ attacker can actually do, not by source-level severity alone.
 ### Coordinated disclosure
 
 We ask reporters to keep issues private until we've shipped a fix:
+
 - **90 days** of coordinated disclosure before public disclosure, **negotiable
   to shorter** for issues under active exploitation (we'll coordinate a
   disclosure date with you).
@@ -302,6 +307,7 @@ We ask reporters to keep issues private until we've shipped a fix:
 The framework follows the versioning policy in `VERSIONING.md` — `@thexjs/*`
 packages ship in lockstep on one versioning PR per cycle. Security fixes are
 subject to the same backport rule:
+
 - **Latest major**: all security fixes ship in the next patch/minor release.
 - **Previous major**: critical/high fixes are backported as patch releases for
   **12 months** after the newer major ships, or until the older major is

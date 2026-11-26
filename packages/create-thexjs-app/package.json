@@ -63,7 +63,7 @@
     "@clack/prompts": "^1.9.0"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
+    "@types/node": "^26.6.6",
     "tsup": "^9.0.0"
   }
 }

@@ -11,6 +11,7 @@ The user has asked you to teach them something. This is a stateful request - the
 ## Teaching Workspace
 
 Treat the current directory as a teaching workspace. Workspace paths (`./lessons/` and the rest) resolve from the directory `/teach` was run in; only the `*-FORMAT.md` links resolve from this skill's folder. The state of their learning is captured in this directory in several files:
+
 - `MISSION.md`: A document capturing the _reason_ the user is interested in the topic. This should be used to ground all teaching. Use the format in [MISSION-FORMAT.md](./MISSION-FORMAT.md).
 - `./reference/*.html`: A directory of reference materials. These are the compressed learnings from the lessons - cheat sheets, reference algorithms, syntax, yoga poses, glossaries. They are the raw units of learning. They should be beautiful documents which print out well, and are designed for quick reference.
 - `RESOURCES.md`: A list of resources which can be explored to ground your teaching in contextual knowledge, or to acquire knowledge and wisdom. Use the format in [RESOURCES-FORMAT.md](./RESOURCES-FORMAT.md).
@@ -22,6 +23,7 @@ Treat the current directory as a teaching workspace. Workspace paths (`./lessons
 ## Philosophy
 
 To learn at a deep level, the user needs three things:
+
 - **Knowledge**, captured from high-quality, high-trust resources
 - **Skills**, acquired through highly-relevant interactive lessons devised by you, based on the knowledge
 - **Wisdom**, which comes from interacting with other learners and practitioners
@@ -33,10 +35,12 @@ Some topics may require more skills than knowledge. Learning more about theoreti
 ### Fluency vs Storage Strength
 
 You should be careful to split between two types of learning:
+
 - **Fluency strength**: in-the-moment retrieval of knowledge
 - **Storage strength**: long-term retention of knowledge
 
 Fluency can give the user an illusory sense of mastery, but storage strength is the real goal. Try to design lessons which build long-term retention by desirable difficulty:
+
 - Using retrieval practice (recall from memory)
 - Spacing (distributing practice over time)
 - Interleaving (mixing up different but related topics in practice - for skills practice only)
@@ -80,6 +84,7 @@ Missions may change as the user develops more skills and knowledge. This is norm
 Each lesson, the user should always feel as if they are being challenged 'just enough'.
 
 The user may specify an exact thing they want to learn. If they don't, figure out their zone of proximal development by:
+
 - Reading their `learning-records`
 - Figuring out the right thing to teach them based on their mission
 - Teach the most relevant thing that fits in their zone of proximal development
@@ -97,6 +102,7 @@ For acquiring knowledge, difficulty is the enemy. It eats working memory you nee
 If knowledge is all about acquisition, skills are about durability and flexibility. Make the knowledge stick.
 
 For skill acquisition, difficulty is the tool. Effortful retrieval is what builds storage strength. Skills should be taught through interactive lessons. There are several tools at your disposal:
+
 - Interactive lessons, using quizzes and light in-browser tasks
 - Lessons which guide the user through a list of real-world steps to take (for instance, yoga poses)
 
@@ -121,6 +127,7 @@ While creating lessons, you should also create reference documents. Lessons can 
 Lessons will rarely be revisited later - reference documents will be. They should be the compressed essence of the lesson, in a format designed for quick reference.
 
 Some learning topics lend themselves to reference:
+
 - Syntax and code snippets for programming
 - Algorithms and flowcharts for processes
 - Yoga poses and sequences for yoga

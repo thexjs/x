@@ -21,6 +21,7 @@ A fresh VM or pod per CI job, started by the git host's own workflow engine; the
 **Pick it when** the git host is GitHub or GitLab and every trigger is a git host event or a clock: the workflow file is the orchestrator and the run page is the observability platform, so one product fills three slots.
 
 Starting points:
+
 - [GitHub Actions](https://docs.github.com/en/actions/reference/limits): the default for an all-GitHub factory; [pricing](https://docs.github.com/en/billing/reference/actions-runner-pricing).
 - [Claude Code GitHub Action](https://code.claude.com/docs/en/github-actions): Claude Code as a workflow step.
 - [GitLab hosted runners](https://docs.gitlab.com/ci/runners/hosted_runners/linux/): an ephemeral VM per job.
@@ -41,6 +42,7 @@ A hosted coding agent with its runner included: the vendor provisions a fresh VM
 **Pick it when** the user wants the fewest moving parts and is happy with that vendor's agent. Confirm its triggers cover the user's ticket tracker.
 
 Starting points:
+
 - [Claude Code cloud](https://code.claude.com/docs/en/claude-code-on-the-web), with [scheduled tasks](https://code.claude.com/docs/en/routines) for cron, API and GitHub event triggers.
 - [Claude Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview): API-first; create a run against an environment and stream events.
 - [Codex cloud](https://developers.openai.com/codex/cloud): a container per task.
@@ -67,6 +69,7 @@ Starting points: [Fly Machines](https://docs.fly.io/machines/overview) ([pricing
 ### The questions that decide the slot
 
 Check each candidate against these, with the factory's runs in hand:
+
 1. **How does the orchestrator start one?** A workflow trigger, an SDK call, an @-mention, an HTTP call, or a vendor queue that a worker claims. Does that fit the orchestrator the design already names?
 2. **What is the max run length, and the concurrency cap?** Find both the default timeout and the ceiling, per plan tier, and what happens at the cap. Hold them against the design's longest run and busiest burst.
 3. **What is the cost shape?** Per minute, per second of vCPU and RAM, active CPU only, per run, per seat, or flat monthly. Is time waiting on the model billed? Are model tokens inside the price or on top?

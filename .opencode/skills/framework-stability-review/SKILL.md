@@ -22,6 +22,7 @@ regardless of CI status.
 
 CI passing means: the tests that were written, pass, on the CI runner, in
 isolation, for this one PR. It does NOT mean:
+
 - the tests cover the actual risk introduced by the change
 - the change is safe when merged alongside other in-flight PRs
 - assumptions stated in commit messages or PR descriptions are actually true
@@ -56,6 +57,7 @@ gh pr diff <N>
 ```
 
 Record for each PR:
+
 - Exact head branch name and base branch
 - Full list of files touched (not a paraphrase)
 - The actual diff content, read in full, not skimmed by filename alone
@@ -71,6 +73,7 @@ potentially contaminated until the diff is read directly.
 ## Step 2 — Cross-PR interaction analysis
 
 When multiple PRs are open/being merged concurrently:
+
 1. Build a file-touch matrix: which files does each PR modify, and does
    any file appear in more than one PR's diff? Overlapping files are a
    MERGE-ORDER risk even if each PR is individually correct — the second
@@ -95,6 +98,7 @@ When multiple PRs are open/being merged concurrently:
 ## Step 3 — Read the diff for logic, not just presence of tests
 
 For each changed file, actually reason through:
+
 - **Correctness of the fix relative to the original bug.** Re-derive the
   bug from first principles using the actual issue description and the
   actual before/after code — don't just check that a test exists and

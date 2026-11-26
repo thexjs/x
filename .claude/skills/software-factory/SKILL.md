@@ -55,6 +55,7 @@ Start from the user's problem, not the factory: untriaged tickets, PRs waiting f
 ### Start slow
 
 Every trigger is an accelerator. Accelerators without brakes make a slop cannon. There are three brakes:
+
 - **Automated checks**: deterministic gates (types, lint, tests) that every run must pass.
 - **Automated review**: a separate run that reads the diff cold against the codebase's standards and the ticket, when there is one.
 - **Human review**: a human reads the PR before it merges; what it catches becomes new automated checks and sharper automated review.
@@ -75,6 +76,7 @@ Each service is a slot. One product can fill several slots, and one server can h
 | Observability platform | none: Actions run pages suffice | an LLM tracing platform        | own app                  |
 
 When the user is choosing a product for a slot, read that slot's survey to get oriented, then research the current options yourself; each survey groups the options by type and lists the questions that decide the slot:
+
 - [TICKET-TRACKERS.md](TICKET-TRACKERS.md)
 - [GIT-HOSTS.md](GIT-HOSTS.md)
 - [RUNNERS.md](RUNNERS.md)
@@ -85,6 +87,7 @@ Buy the services and build the tasks: the tasks carry the user's design, the ser
 ### Question every task
 
 For each task, answer:
+
 1. What triggers it?
 2. What does it do, and which services does it read and write?
 3. What does it trigger next?
