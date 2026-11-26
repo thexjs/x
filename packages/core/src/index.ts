@@ -174,6 +174,17 @@ export {
   type TrustedProxyOptions,
 } from "./security/trusted-proxy";
 export {
+  buildSeoHeadTags,
+  type GenerateSeo,
+  generateRobotsTxt,
+  generateSitemapXml,
+  type OpenGraphData,
+  type SeoConfig,
+  type SeoData,
+  type SitemapEntry,
+  type TwitterCardData,
+} from "./seo";
+export {
   generateServerFunctionClient,
   getServerFunctionHandler,
   registerServerFunctions,
