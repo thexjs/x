@@ -1,5 +1,12 @@
 # @thexjs/core
 
+## 1.14.2
+
+### Patch Changes
+
+- e579b57: Reformat README.md for the biome 2.6.8 upgrade (blank line before/after a bulleted list). Docs-only, no behavior change.
+- e1d7dd8: Reconnect the dev live-reload `EventSource` with bounded exponential backoff after an error and perform a full page reload on reconnect so open tabs recover with fresh HTML when the dev server restarts.
+
 ## 1.14.1
 
 ### Patch Changes

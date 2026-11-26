@@ -1,5 +1,13 @@
 # create-thexjs-app
 
+## 1.3.1
+
+### Patch Changes
+
+- e579b57: Reformat README.md for the biome 2.6.8 upgrade (blank line before/after a bulleted list). Docs-only, no behavior change.
+- d9ef4c8: Bump `@clack/prompts` from 1.7.0 to 1.9.0 (dependency maintenance, no behavior change).
+- b17f869: Bump `@types/node` from 26.6.5 to 26.6.6 (dependency maintenance, no behavior change).
+
 ## 1.3.0
 
 ### Minor Changes
