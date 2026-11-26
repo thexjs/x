@@ -29,17 +29,49 @@ type InferClient<T, P extends string> = {
     : never;
 };
 
+type ClientShape<T extends EnvSchemaInput> = InferClient<
+  T["client"],
+  T["clientPrefix"] extends string ? T["clientPrefix"] : ""
+>;
+type ServerShape<T extends EnvSchemaInput> = InferServer<T["server"]>;
+
 export function createEnv<T extends EnvSchemaInput>(
   schema: T,
 ): InferServer<T["server"]> &
-  InferClient<T["client"], T["clientPrefix"] extends string ? T["clientPrefix"] : ""> {
+  InferClient<T["client"], T["clientPrefix"] extends string ? T["clientPrefix"] : ""> & {
+    /**
+     * Only the validated `client` keys (the ones required to start with
+     * `clientPrefix`), as their own object.
+     *
+     * This is the structurally-safe shape to serialize for the browser —
+     * `JSON.stringify(env.client)` can only ever contain client-prefixed
+     * values, so a hydration payload like `window.__ENV__ = env.client`
+     * can't leak a server secret even if the schema grows one later.
+     *
+     * Serializing the top-level `env` object directly still works (every
+     * flat key documented above is still present, unchanged, for backward
+     * compatibility) but is discouraged for exactly that reason: it mixes
+     * server-only values into whatever gets stringified.
+     */
+    client: ClientShape<T>;
+    /**
+     * Only the validated `server` keys, as their own object. Provided for
+     * symmetry with `client` — most code should keep reading server values
+     * off the flat top-level object (or this), never off `.client`.
+     */
+    server: ServerShape<T>;
+  } {
   const errors: string[] = [];
   const result: Record<string, unknown> = {};
+  const serverResult: Record<string, unknown> = {};
+  const clientResult: Record<string, unknown> = {};
 
   if (schema.server) {
     for (const [key, validator] of Object.entries(schema.server)) {
       try {
-        result[key] = validator.parse(schema.runtimeEnv[key]);
+        const value = validator.parse(schema.runtimeEnv[key]);
+        result[key] = value;
+        serverResult[key] = value;
       } catch (err) {
         errors.push(`server.${key}: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -54,7 +86,9 @@ export function createEnv<T extends EnvSchemaInput>(
         continue;
       }
       try {
-        result[key] = validator.parse(schema.runtimeEnv[key]);
+        const value = validator.parse(schema.runtimeEnv[key]);
+        result[key] = value;
+        clientResult[key] = value;
       } catch (err) {
         errors.push(`client.${key}: ${err instanceof Error ? err.message : String(err)}`);
       }
@@ -64,6 +98,11 @@ export function createEnv<T extends EnvSchemaInput>(
   if (errors.length > 0) {
     throw new Error(`Environment validation failed:\n  ${errors.join("\n  ")}`);
   }
+
+  // Assigned after validation so the flat top-level keys are settled first;
+  // these are read-oriented structural views, never inputs to validation.
+  result.client = clientResult;
+  result.server = serverResult;
 
   return result as never;
 }
