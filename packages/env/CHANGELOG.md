@@ -1,5 +1,11 @@
 # @thexjs/env
 
+## 1.1.2
+
+### Patch Changes
+
+- e579b57: Reformat README.md for the biome 2.6.8 upgrade (blank line before/after a bulleted list). Docs-only, no behavior change.
+
 ## 1.1.1
 
 ### Patch Changes
